@@ -1,6 +1,6 @@
-params.fastq='/scratch/cgsb/desplan/Libraries_raw_data/2025-02-27-Azenta-30-1154387723/00_fastq/*.fastq.gz'
-params.fasta='/scratch/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
-params.fastqp='/scratch/cgsb/desplan/Libraries_raw_data/2025-02-27-Azenta-30-1154387723/00_fastq/*_R{1,2}_001.fastq.gz'
+params.fastq = '/scratch/cgsb/desplan/Libraries_raw_data/2025-02-27-Azenta-30-1154387723/00_fastq/*.fastq.gz'
+params.fasta = '/scratch/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
+params.fastqp = '/scratch/cgsb/desplan/Libraries_raw_data/2025-02-27-Azenta-30-1154387723/00_fastq/*_R{1,2}_001.fastq.gz'
 
 process fastqc {
   cpus '4'
@@ -10,9 +10,10 @@ process fastqc {
   publishDir 'int/wgs_fastqc/', mode: 'copy', overwrite: false
 
   input:
-    path fastq
+  path fastq
+
   output:
-    path "${fastq.baseName}.html"
+  path "${fastq.baseName}.html"
 
   script:
   """
@@ -27,9 +28,10 @@ process bwa2_index {
   time '10m'
 
   input:
-    path fasta
+  path fasta
+
   output:
-    path "dm6.*"
+  path "dm6.*"
 
   script:
   """
@@ -45,9 +47,10 @@ process cutadapt {
   module 'cutadapt/4.9'
 
   input:
-    tuple val(sampleId), file(reads)
+  tuple val(sampleId), file(reads)
+
   output:
-    tuple val("${sampleId}"), path('r1.fastq.gz'), path('r2.fastq.gz')
+  tuple val("${sampleId}"), path('r1.fastq.gz'), path('r2.fastq.gz')
 
   script:
   """
@@ -67,10 +70,11 @@ process bwa2_align {
   time '4h'
 
   input:
-    tuple val(sampleId), path(r1), path(r2)
-    path idx
+  tuple val(sampleId), path(r1), path(r2)
+  path idx
+
   output:
-    path "${sampleId}.sam"
+  path "${sampleId}.sam"
 
   script:
   """
@@ -86,10 +90,11 @@ process to_bam {
   publishDir 'int/wgs_bam/', mode: 'copy', overwrite: false
 
   input:
-    path sam
+  path sam
+
   output:
-    path "${sam.baseName}.bam"
-    path "${sam.baseName}.bam.bai"
+  path "${sam.baseName}.bam"
+  path "${sam.baseName}.bam.bai"
 
   script:
   """
@@ -97,7 +102,6 @@ process to_bam {
   samtools sort -@ ${task.cpus} -o ${sam.baseName}.bam
   samtools index -@ ${task.cpus} ${sam.baseName}.bam
   """
-
 }
 
 workflow {
@@ -107,8 +111,8 @@ workflow {
   fqs = channel.fromPath(params.fastq)
   fastqc(fqs)
 
-  fqp = channel.fromFilePairs(params.fastqp, checkIfExists:true)
+  fqp = channel.fromFilePairs(params.fastqp, checkIfExists: true)
   fqt = cutadapt(fqp)
-  bwa2_align(fqt, idxf) |\
-  to_bam
+  bwa2_align(fqt, idxf)
+    | to_bam
 }
