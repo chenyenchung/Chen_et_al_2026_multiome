@@ -4,3 +4,4 @@ int
 log
 result
 *.html
+.Rproj.user

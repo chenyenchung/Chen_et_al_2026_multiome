@@ -1,0 +1,3 @@
+[submodule "extern/popscle_helper_tools"]
+	path = extern/popscle_helper_tools
+	url = git@github.com:chenyenchung/popscle_helper_tools.git
