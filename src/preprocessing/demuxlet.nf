@@ -4,7 +4,7 @@ nextflow.preview.output = true
 params.lines = '/scratch/ycc520/thesis/data/line_used.txt'
 params.input = '/vast/ycc520/data/dgrp/dgrp2_dm6.vcf'
 params.gtf = '/vast/ycc520/data/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
-params.driver = '/scratch/ycc520/thesis/int/wgs_variant/gatk_snp.recalibrated.vcf.gz'
+params.driver = '/scratch/ycc520/thesis/int/wgs_variant/raw_variants.vcf.gz'
 params.extern = '/scratch/ycc520/thesis/extern'
 params.libpaths = '/scratch/ycc520/thesis/data/bam_new'
 params.popscle = '/vast/ycc520/data/popscle.sif'
@@ -68,34 +68,6 @@ process BcftoolsIntersect {
   """
 }
 
-process GenerateSharedVCF {
-  module 'bcftools/intel/1.14:r/gcc/4.4.0'
-
-  cpus '1'
-  time '15m'
-  memory '1GB'
-
-  input:
-  val lib
-  path meta
-  tuple path(driver), path(dgrp)
-
-  output:
-  tuple val("${lib}"), path("${lib}_shared.vcf.gz"), path("${lib}_shared.vcf.gz.csi")
-
-  script:
-  """
-    generate_synth.R \
-      --lib ${lib} \
-      --meta ${meta} \
-      --dgrp ${dgrp} \
-      --driver ${driver} \
-      --out "${lib}_shared.vcf.gz"
-    gunzip "${lib}_shared.vcf.gz"
-    bgzip "${lib}_shared.vcf"
-    bcftools index "${lib}_shared.vcf.gz"
-    """
-}
 
 process GenerateASISVCF {
   module 'bcftools/intel/1.14:r/gcc/4.4.0'
@@ -109,7 +81,7 @@ process GenerateASISVCF {
   path dgrp
 
   output:
-  tuple val("${lib}"), path("${lib}_asis.vcf.gz"), path("${lib}_asis.vcf.gz.csi")
+  tuple val("${lib}"), path("${lib}_asis.vcf.gz")
 
   script:
   """
@@ -125,49 +97,28 @@ process GenerateASISVCF {
 }
 
 process MaskHighlyExpGenes {
-  module 'r/gcc/4.4.0'
+  module 'bcftools/intel/1.14:r/gcc/4.4.0'
   cpus '1'
   memory '8GB'
   time '15m'
 
   input:
-  val lib
+  tuple val(lib), path(vcf)
   path h5path
   path gtf
 
   output:
-  tuple val("${lib}"), path("${lib}_mask.bed")
+  tuple val("${lib}"), path("${lib}_masked.vcf.gz")
 
   script:
   """
-    get_top.R \
-      --lib ${lib} \
-      --h5 ${h5path} \
-      --gtf ${gtf}
-    """
-}
-
-process ConcatVCF {
-  module "bcftools/intel/1.14:samtools/intel/1.14:vcftools/intel/0.1.16"
-  cpus '1'
-  memory '1GB'
-  time '15m'
-
-  input:
-  tuple val(lib), path(shared), path(sharedi), path(dgrp), path(dgrpi), path(mask)
-
-  output:
-  tuple val("${lib}"), path("${lib}_info.vcf.gz")
-
-  script:
-  """
-  source "${params.extern}/popscle_helper_tools/filter_vcf_file_for_popscle.sh"
-  bcftools concat -a \
-    ${shared} ${dgrp} |\
-    bcftools view -T ^${mask} |\
-    calculate_AF_AC_AN_values_based_on_genotype_info |\
-    bgzip > "${lib}_info.vcf.gz"
-    bcftools index "${lib}_info.vcf.gz"
+  get_top.R \
+    --lib ${lib} \
+    --h5 ${h5path} \
+    --gtf ${gtf}
+  bcftools view ${vcf} \
+    -Oz -o "${lib}_masked.vcf.gz" \
+    -T "^${lib}_mask.bed"
   """
 }
 
@@ -265,7 +216,7 @@ process Mpileup {
   module 'samtools/intel/1.14:bcftools/intel/1.14:bedtools/intel/2.29.2:singularity/3.7.4'
   cpus '1'
   memory '4GB'
-  time '6h'
+  time '12h'
 
   input:
   tuple val(lib), path(vcf), path(bam), path(bclist)
@@ -343,20 +294,14 @@ workflow {
   // Find DGRP SNPs that are confounded by driver line genotypes
   driver_ch = BcftoolsIntersect(file(params.driver), dgrp_ch)
 
-  // Generate predicted genotype VCFs
-  shared_ch = GenerateSharedVCF(lib_ch, file(params.lines), driver_ch.shared)
   asis_ch = GenerateASISVCF(lib_ch, file(params.lines), driver_ch.dgrp_asis)
 
   // Mask highly expressed genes from informative variants
-  mask_ch = MaskHighlyExpGenes(lib_ch, file(params.libpaths), file(params.gtf))
-
-  // Concatenate VCF files with masking
-  join_ch = shared_ch.join(asis_ch).join(mask_ch)
-  info_ch = ConcatVCF(join_ch)
+  mask_ch = MaskHighlyExpGenes(asis_ch, file(params.libpaths), file(params.gtf))
 
   // Permissively (> 300 fragments & > 200 genes) filter each library
   bclist_ch = PermissiveFilterBarcodes(lib_ch, file(params.libpaths))
-  demux_vch = bclist_ch.join(info_ch)
+  demux_vch = bclist_ch.join(mask_ch)
 
   lib_ch
     | map { lib ->
@@ -371,12 +316,12 @@ workflow {
 
   fbam_ch = PreFilterBAM(rawbam_ch)
   mbam_ch = MergeBAM(fbam_ch)
-  sinfo_ch = SortVCF(info_ch.join(mbam_ch))
+  sinfo_ch = SortVCF(mask_ch.join(mbam_ch))
 
   // Run mpileup per 1k barcode to run in parallel
   sbclist_ch = bclist_ch
     | map { lib, bcpath ->
-      def chunk = bcpath.splitText(by: 500, file: true)
+      def chunk = bcpath.splitText(by: 1000, file: true)
       return [lib, chunk]
     }
     | transpose
@@ -391,13 +336,12 @@ workflow {
 
   idemux_ch = Demuxlet(vplp_ch, file(params.popscle))
   out_ch = CollectTable(idemux_ch.groupTuple())
-
   publish:
   tbls = out_ch
 }
 
 output {
-    tbls {
+  tbls {
     path "demuxlet/"
   }
 }
