@@ -4,7 +4,7 @@ nextflow.preview.output = true
 params.lines = '/scratch/ycc520/thesis/data/line_used.txt'
 params.input = '/vast/ycc520/data/dgrp/dgrp2_dm6.vcf'
 params.gtf = '/vast/ycc520/data/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
-params.driver = '/scratch/ycc520/thesis/int/wgs_variant/raw_variants.vcf.gz'
+params.driver = '/scratch/ycc520/thesis/int/wgs_variant/gatk_snp.recalibrated.vcf.gz'
 params.extern = '/scratch/ycc520/thesis/extern'
 params.libpaths = '/scratch/ycc520/thesis/data/bam_new'
 params.popscle = '/vast/ycc520/data/popscle.sif'
@@ -171,6 +171,41 @@ process PreFilterBAM {
   """
 }
 
+process FilterByCoverage {
+  module 'bedops/intel/2.4.39:bcftools/intel/1.14:bedtools/intel/2.29.2:samtools/intel/1.14'
+
+  input:
+  tuple val(lib), path(bam_gex), path(bam_atac), path(vcf)
+
+  output:
+  tuple val("${lib}"), path("${lib}_info.vcf.gz")
+
+  script:
+  """
+  gunzip -f ${vcf}
+  mv *.vcf input.vcf
+  
+  vcf2bed < input.vcf |\
+    awk 'BEGIN{OFS="\t"}{print \$1,\$2,\$3,\$4}' |\
+    sort -k1,1 -k2,2n > dgrp.bed
+  bedtools coverage -a dgrp.bed \
+    -b ${bam_gex} -counts -sorted |\
+    awk '\$5 >= 10' > coverage.bed
+
+  bedtools coverage -a dgrp.bed \
+    -b ${bam_atac} -counts -sorted |\
+    awk '\$5 >= 10' >> coverage.bed
+
+  sort -k1,1 -k2,2n coverage.bed |\
+    bedtools merge -i - > coverage_merged.bed
+
+  bgzip input.vcf
+  bcftools index input.vcf.gz
+  bcftools view -Oz -R coverage_merged.bed \
+    input.vcf.gz > ${lib}_info.vcf.gz
+  """
+}
+
 process MergeBAM {
   module 'samtools/intel/1.14'
   cpus '8'
@@ -315,13 +350,18 @@ workflow {
     | set { rawbam_ch }
 
   fbam_ch = PreFilterBAM(rawbam_ch)
+  
+  // Calculate coverage per bam to remove SNPs without sufficient support
+  coverage_ch = fbam_ch.combine(info_ch, by: 0)
+  cinfo_ch = FilterByCoverage(coverage_ch)
+
   mbam_ch = MergeBAM(fbam_ch)
-  sinfo_ch = SortVCF(mask_ch.join(mbam_ch))
+  sinfo_ch = SortVCF(cinfo_ch.join(mbam_ch))
 
   // Run mpileup per 1k barcode to run in parallel
   sbclist_ch = bclist_ch
     | map { lib, bcpath ->
-      def chunk = bcpath.splitText(by: 1000, file: true)
+      def chunk = bcpath.splitText(by: 500, file: true)
       return [lib, chunk]
     }
     | transpose
