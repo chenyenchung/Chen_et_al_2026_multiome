@@ -70,7 +70,7 @@ process BcftoolsIntersect {
 
 
 process GenerateASISVCF {
-  module 'bcftools/intel/1.14:r/gcc/4.4.0'
+  module 'bcftools/intel/1.14:r/gcc/4.5.0'
   cpus '1'
   time '15m'
   memory '2GB'
@@ -97,7 +97,7 @@ process GenerateASISVCF {
 }
 
 process MaskHighlyExpGenes {
-  module 'bcftools/intel/1.14:r/gcc/4.4.0'
+  module 'bcftools/intel/1.14:r/gcc/4.5.0'
   cpus '1'
   memory '8GB'
   time '15m'
@@ -123,7 +123,8 @@ process MaskHighlyExpGenes {
 }
 
 process PermissiveFilterBarcodes {
-  module 'r/gcc/4.4.0'
+  publishDir 'int/permissive_cbc/', mode: 'copy'
+  module 'r/gcc/4.5.0'
   cpus '1'
   time '15m'
   memory '8GB'
@@ -201,8 +202,10 @@ process FilterByCoverage {
 
   bgzip input.vcf
   bcftools index input.vcf.gz
+  source "${params.extern}/popscle_helper_tools/filter_vcf_file_for_popscle.sh"
   bcftools view -Oz -R coverage_merged.bed \
-    input.vcf.gz > ${lib}_info.vcf.gz
+    input.vcf.gz |\
+    calculate_AF_AC_AN_values_based_on_genotype_info > ${lib}_info.vcf.gz
   """
 }
 
@@ -248,17 +251,16 @@ process SortVCF {
 }
 
 process Mpileup {
-  module 'samtools/intel/1.14:bcftools/intel/1.14:bedtools/intel/2.29.2:singularity/3.7.4'
   cpus '1'
-  memory '4GB'
-  time '12h'
+  memory '2GB'
+  time '4h'
 
   input:
   tuple val(lib), path(vcf), path(bam), path(bclist)
   path image
 
   output:
-  tuple val("${lib}"), path("${bclist.baseName}_demux/*")
+  tuple val("${lib}"), path("${bclist.baseName}.pileup*")
 
   script:
   """
@@ -267,55 +269,167 @@ process Mpileup {
     --sam ${bam} \
     --vcf ${vcf} \
     --group-list ${bclist} \
-    --out ${bclist.baseName}_demux/samples_to_demultiplex.pileup"
+    --out ${bclist.baseName}.pileup"
   """
 }
 
-process Demuxlet {
-  module 'samtools/intel/1.14:bcftools/intel/1.14:bedtools/intel/2.29.2:singularity/3.7.4'
+process IntegratePL {
+  publishDir 'int/mpileup/', mode: 'copy'
   cpus '1'
   memory '4GB'
-  time '15m'
+  time '2h'
+  conda 'python=3.12'
+
+  input:
+  tuple val(lib), path(demux_slice)
+
+  output:
+  tuple val("${lib}"), path("${lib}.pileup.*.gz")
+
+  script:
+  """
+#!/usr/bin/env python
+import os
+import gzip
+import re
+import hashlib
+import shutil
+
+lib = \'${lib}\'
+files = os.listdir('./')
+prefixes = []
+for f in files:
+  if re.search(r'\\.gz\$', f):
+    p = re.sub(r'\\.pileup\\..{3}\\.gz', '', f)
+    if p not in prefixes:
+      prefixes.append(p)
+
+uid = 0
+uid_dict= {}
+cel_header = True
+plp_header = True
+
+var_path = []
+for d in prefixes:
+    ## Deal with .cel files
+    with gzip.open(f'./{d}.pileup.cel.gz', 'rt') as f:
+        with gzip.open(os.path.join('./', f'{lib}.pileup.cel.gz'), 'at') as o:
+            lc = 0
+            for line in f:
+                if lc == 0:
+                    if cel_header:
+                        o.write(line)
+                        cel_header = False
+                else:
+                    content = line.strip('\\n')
+                    content = content.split('\\t')
+                    # Store the barcode IDs (first field) to a dictionary
+                    uid_dict[str(content[0])] = str(uid)
+                    # and recode incrementally across slices
+                    content[0] = str(uid)
+                    uid = uid + 1
+                    out = '\\t'.join(content) + '\\n'
+                    o.write(out)
+                lc = lc + 1
+
+    ## Deal with .umi files
+    with gzip.open(f'./{d}.pileup.umi.gz', 'rt') as f:
+        with gzip.open(os.path.join('./', f'{lib}.pileup.umi.gz'), 'at') as o:
+            ulc = 0
+            for line in f:
+                content = line.strip('\\n').split('\\t')
+                # Recode barcode IDs with existing dictionary
+                content[0] = uid_dict[content[0]]
+                o.write('\\t'.join(content) + '\\n')
+                ulc = ulc + 1
+
+    ## Deal with .plp files
+    with gzip.open(f'./{d}.pileup.plp.gz', 'rt') as f:
+        with gzip.open(os.path.join('./', f'{lib}.pileup.plp.gz'), 'at') as o:
+            plc = 0
+            for line in f:
+                if plc == 0:
+                    if plp_header:
+                        o.write(line)
+                        plp_header = False
+                else:
+                    content = line.strip('\\n')
+                    content = content.split('\\t')
+                    # Recode barcode IDs with existing dictionary
+                    content[0] = uid_dict[content[0]]
+                    out = '\\t'.join(content) + '\\n'
+                    o.write(out)
+                plc = plc + 1
+
+    var_path.append(f'./{d}.pileup.var.gz')
+
+var_hash = dict()
+for v in var_path:
+    with open(v, 'rb') as f:
+        hash = hashlib.file_digest(f, 'sha256').hexdigest()
+        if hash in var_hash:
+            var_hash[hash] += 1
+        else:
+            var_hash[hash] = 1
+
+
+if len(var_hash) == 1:
+    shutil.copyfile(var_path[0], f'{lib}.pileup.var.gz')
+else:
+    raise ValueError(f'In {lib}, there is more than one version of .var.gz.')
+
+print(f'[INFO] Completed integrating pileup data from {uid} cells.')
+"""
+}
+
+process Demuxlet {
+  cpus '1'
+  memory '32GB'
+  time '30m'
+  publishDir 'int/demux/', mode: 'copy'
 
   input:
   tuple val(lib), path(plp), path(vcf)
   path image
 
   output:
-  tuple val("${lib}"), path("${plp}.best")
+  tuple val("${lib}"), path("${lib}.best")
 
   script:
   """
   singularity run ${image} "demuxlet \
-    --plp ${plp}/samples_to_demultiplex.pileup \
+    --plp ${plp}/${lib}.pileup \
     --vcf ${vcf} \
     --field GT \
     --alpha 0 --alpha 0.5 \
-    --out ${plp}"
+    --out ${lib}"
   """
 }
 
-process CollectTable {
-
+process Freemux {
   cpus '1'
-  memory '1GB'
-  time '15m'
+  memory '48GB'
+  time '8h'
+  publishDir 'int/freemux/', mode: 'copy'
 
   input:
-  tuple val(lib), path(tbl)
+  tuple val(lib), path(plp)
+  path image
 
   output:
-  path "${lib}.best"
+  tuple val("${lib}"), path("${lib}.clust1.samples")
 
   script:
   """
-  awk 'NR == 1 || FNR != 1' ${tbl} \
-    > "${lib}.best"
+  singularity run ${image} "freemuxlet \
+    --plp ${plp}/${lib}.pileup \
+    --nsample 18 \
+    --out ${lib}"
+  gunzip "${lib}.clust1.samples.gz"
   """
 }
 
 workflow {
-  main:
   lib_ch = Channel.fromList(params.libs)
   // Get a list of lines that were ever used for subsetting
   Channel.fromPath(params.lines)
@@ -350,38 +464,39 @@ workflow {
     | set { rawbam_ch }
 
   fbam_ch = PreFilterBAM(rawbam_ch)
-  
+
   // Calculate coverage per bam to remove SNPs without sufficient support
-  coverage_ch = fbam_ch.combine(info_ch, by: 0)
+  coverage_ch = fbam_ch.combine(mask_ch, by: 0)
   cinfo_ch = FilterByCoverage(coverage_ch)
 
   mbam_ch = MergeBAM(fbam_ch)
   sinfo_ch = SortVCF(cinfo_ch.join(mbam_ch))
 
-  // Run mpileup per 1k barcode to run in parallel
+  // Run mpileup per 100 barcode to run in parallel
   sbclist_ch = bclist_ch
     | map { lib, bcpath ->
-      def chunk = bcpath.splitText(by: 500, file: true)
+      def chunk = bcpath.splitText(by: 100, file: true)
       return [lib, chunk]
     }
     | transpose
   plp_ch = Mpileup(sinfo_ch.join(mbam_ch).combine(sbclist_ch, by: 0), file(params.popscle))
 
-  vplp_ch = plp_ch
+  intm_ch = plp_ch
+    | groupTuple()
+    | map { l, p ->
+      def fp = p.flatten()
+      return [l, fp]
+    }
+    | IntegratePL
+  vplp_ch = intm_ch
     | map { l, p ->
       def pbase = p[0].getParent()
       return [l, pbase]
     }
-    | combine(sinfo_ch, by: 0)
 
-  idemux_ch = Demuxlet(vplp_ch, file(params.popscle))
-  out_ch = CollectTable(idemux_ch.groupTuple())
-  publish:
-  tbls = out_ch
-}
+  demux_out = Demuxlet(vplp_ch.join(cinfo_ch), params.popscle)
+  freemux_out = Freemux(vplp_ch, params.popscle)
 
-output {
-  tbls {
-    path "demuxlet/"
-  }
+  demux_out | view
+  freemux_out | view
 }
