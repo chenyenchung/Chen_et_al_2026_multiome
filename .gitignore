@@ -2,8 +2,10 @@ data
 static
 int
 log
+tmp
 result
 *.html
+*.arrow
 .Rproj.user
 .Renviron
 QualityControl
