@@ -12,7 +12,9 @@ stopifnot(
   !is.null(args$obj),
   file.exists(args$obj),
   !is.null(args$proot),
-  dir.exists(args$proot)
+  dir.exists(args$proot),
+  !is.null(args$depth),
+  file.exists(args$depth)
 )
 
 renv::load(args$proot)
@@ -292,6 +294,19 @@ p_nstat <- DimRasPlot(obj, group.by = "notch_status") +
   labs(color = "Notch Status") +
   theme(plot.title = element_blank())
 
+p_sori <- DimRasPlot(obj, group.by = "spatial_origin") +
+  scale_color_manual(
+    values = c(
+      "pxb" = "#1B9E77",
+      "optix" = "#7570B3",
+      "dpp" = "#D95F02"
+    ),
+    na.value = "grey80",
+    breaks = c("pxb", "optix", "dpp")
+  ) +
+  labs(color = "Spatial Origin") +
+  theme(plot.title = element_blank())
+
 # Temporal identity: By concentric genes
 conc_plot <- AggregateExpression(
   obj, assay = "RNA", features = c(
@@ -421,6 +436,7 @@ ggsave_sep(p_class, file.path("fig", "class.pdf"), width = 5, height = 4)
 ggsave_sep(p_bclass, file.path("sup", "broad_class.pdf"), width = 5, height = 4)
 ggsave_sep(p_nstat, file.path("fig", "notch_status.pdf"), width = 5, height = 4)
 ggsave_sep(p_tid, file.path("fig", "temporal_identity.pdf"), width = 5, height = 4)
+ggsave_sep(p_sori, file.path("fig", "spatial_origin.pdf"), width = 5, height = 4)
 ggsave_sep(
   class_mk_hm, file.path("sup", "class_marker_heatmap.pdf"),
   width = 6, height = 4
@@ -457,7 +473,64 @@ f_list <- lapply(names(ins_list), function(lib) {
 DefaultAssay(obj) <- "ATAC"
 Fragments(obj) <- f_list
 
+idepth <- read.csv(args$depth, header = FALSE, row.names = 1)
+colnames(idepth) <- "nCount_insertion"
+obj <- AddMetaData(obj, metadata = idepth)
+obj@meta.data$X <- NULL
+
+# Compute mixing statistics before saving
+obj[["seurat_clusters"]] <- Idents(obj)
+Idents(obj) <- "class"
+
+get_global_simpsons <- function(obj, group.by) {
+  label_freq <- table(obj[[]][[group.by]])
+  label_proportion <- label_freq / length(obj[[]][[group.by]])
+  return(sum(label_proportion ^ 2))
+}
+
+get_local_simpsons <- function(obj, group.by, nn.name, gsi) {
+  lsi <- vapply(seq_len(ncol(obj)), function(x) {
+    idx <- obj@neighbors[[nn.name]]@nn.idx[x, ]
+    local_freq <- table(obj[[]][[group.by]][idx])
+    local_prop <- local_freq / length(idx)
+    local_si <- sum(local_prop ^ 2)
+    return((local_si - gsi) / (1 - gsi))
+  }, numeric(1))
+}
+
+spatial_gsi <- get_global_simpsons(obj, "spatial_origin")
+spatial_clsi <- get_local_simpsons(
+  obj, "spatial_origin", "weighted.nn", spatial_gsi
+)
+
+# Remove NE and LPC (no temporal annotation)
+temporal_gsi <- get_global_simpsons(
+  subset(obj, idents = c("NB", "GMC", "neuron")), "temporal_identity"
+)
+temporal_clsi <- get_local_simpsons(
+  obj, "temporal_identity", "weighted.nn", temporal_gsi
+)
+
+temporal_clsi[!Idents(obj) %in% c("NB", "GMC", "neuron")] <- NA
+
+# Only neurons has Notch annotation
+notch_gsi <- get_global_simpsons(
+  subset(obj, idents = "neuron"), "notch_status"
+)
+
+notch_clsi <- get_local_simpsons(
+  obj, "notch_status", "weighted.nn", notch_gsi
+)
+notch_clsi[!Idents(obj) == "neuron"] <- NA
+
+obj$spatial_clsi <- spatial_clsi
+obj$temporal_clsi <- temporal_clsi
+obj$notch_clsi <- notch_clsi
+
+Idents(obj) <- "seurat_clusters"
+
 saveRDS(obj, file.path("obj", "annotated.rds"))
+write.csv(obj@meta.data, "metadata.csv")
 
 on_obj <- subset(obj, idents = c(
   "15", "2", "4", "0", "1", "9", "5", "17", "30",
@@ -467,6 +540,7 @@ saveRDS(on_obj, file.path("obj", "non_obj.rds"))
 rm(on_obj)
 gc()
 
+Idents(obj) <- "seurat_clusters"
 off_obj <- subset(obj, idents = c(
   "15", "2", "4", "0", "1", "9", "5", "17", "30",
   "34", "19", "31", "27", "26", "32", "18", "21",

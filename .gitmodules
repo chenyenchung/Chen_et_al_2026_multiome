@@ -1,3 +1,6 @@
 [submodule "extern/popscle_helper_tools"]
 	path = extern/popscle_helper_tools
 	url = git@github.com:chenyenchung/popscle_helper_tools.git
+[submodule "extern/scbamop"]
+	path = extern/scbamop
+	url = git@github.com:chenyenchung/scbamop.git
