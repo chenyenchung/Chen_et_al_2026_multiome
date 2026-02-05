@@ -7,6 +7,7 @@ FindVariablePeaks <- function(obj, n, assay = "ATAC") {
 }
 
 library(R.utils)
+options(future.globals.maxSize = 1024 ^ 3)
 
 args <- commandArgs(trailingOnly = TRUE, asValues = TRUE)
 

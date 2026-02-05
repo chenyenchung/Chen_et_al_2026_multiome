@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 library(R.utils)
+options(future.globals.maxSize = 1024 ^ 3)
 
 args <- commandArgs(trailingOnly = TRUE, asValues = TRUE)
 if (interactive()) {
@@ -20,14 +21,13 @@ library(Signac)
 library(AnnotationHub)
 library(patchwork)
 
-
 obj_path <- args$obj
 obj <- readRDS(obj_path)
 
 # DimPlot(obj, label = TRUE) + NoLegend() |
-#   VlnPlot(obj, "nn_conf", pt.size = 0) + NoLegend()
+  # VlnPlot(obj, "nn_conf", pt.size = 0) + NoLegend()
 
-anno_update <- as.POSIXct("2026-01-12 00:55:00 EST")
+anno_update <- as.POSIXct("2026-02-06 15:55:00 EST")
 obj_creation <- file.info(obj_path)$ctime
 
 # If the object is newer than annotation, we should manually review
@@ -35,28 +35,28 @@ stopifnot(
   obj_creation < anno_update
 )
 
-# table(obj$wsnn_res.1, obj$nn_pred_label)["27", ] |> sort()
-# a <- FindMarkers(obj, "29", only.pos = TRUE, assay = "SCT")
-# a <- subset(a, p_val_adj < 0.001 & avg_log2FC > 1.5)
+table(obj$wsnn_res.1, obj$nn_pred_label)["1", ] |> sort()
+a <- FindMarkers(obj, "33", only.pos = TRUE, assay = "SCT")
+a <- subset(a, p_val_adj < 0.001 & avg_log2FC > 1.5)
 
 exclude <- c(
   # Low confidence overall
-  "21", # Closest call: 85
-  "11", # Closest call: 85
-  "36", # Closest call: 102
+  "7", # Closest call: 102
+  "13", # Closest call: 85
   "18", # Closest call: 85
-  "6", # Closest call: 102
-  "30", # Closest call: 85/102
+  "22", # Closest call: 85
+  "35", # Closest call: 102
+  "36", # Closest call: 87
   "37", # Unclear cells expressing Ilp3, wrapping glia?
-  "13", # Ase & Run+ & Optix+ -- likely not OPC-origin
-  "28", # Likely LC10b
-  "12", # No positive marker at adj.p < 0.001 & log2FC > 1.5, suspecting LQ.
-  "26", # IPC progenitors (GMC1/GMC2 like)?
-  "35", # Perineural glia?
-  "20", # Unknown Obp-rich population -- likely not OPC-origin.
-  "33", # Likely C2/3
+  "25", # Likely LC10b or Y3
+  "14", # Ase & Run+ & Optix+ -- likely not OPC-origin
+  "32", # Likely C2/3
   "34", # Likely T2/3
-  "27" # Likely T4/5
+  "27", # Likely T4/5
+  "15", # No positive marker at adj.p < 0.001 & log2FC > 1.5, suspecting LQ.
+  "28", # No positive marker at adj.p < 0.001 & log2FC > 1.5, suspecting LQ.
+  "26", # IPC progenitors (GMC1/GMC2 like)?
+  "30" # Perineural glia?
 )
 
 obj <- subset(obj, idents = setdiff(levels(Idents(obj)), exclude))

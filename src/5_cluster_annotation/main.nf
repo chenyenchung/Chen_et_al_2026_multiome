@@ -6,10 +6,10 @@ params.root = '/scratch/ycc520/thesis'
 params.initobj = '/scratch/ycc520/thesis/int/objects/raw_cluster.rds'
 params.frags = '/scratch/ycc520/thesis/int/insertion_np'
 params.bam = '/scratch/ycc520/thesis/data/bam_new'
-params.gtf = '/scratch/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
-params.fai = '/scratch/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa.fai'
+params.gtf = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
+params.fai = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa.fai'
 params.cbc = '/scratch/ycc520/thesis/int/filtered_barcode/'
-params.binsize = 1 
+params.binsize = 1
 
 process GetDepth {
   conda 'python=3.14'
@@ -32,7 +32,7 @@ process GetDepth {
 }
 
 process Annotate {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '16GB'
   time '30m'
@@ -44,8 +44,6 @@ process Annotate {
 
   output:
   wobj: Path = file('obj/annotated.rds')
-  onobj: Path = file('obj/non_obj.rds')
-  offobj: Path = file('obj/noff_obj.rds')
   metadata: Path = file('metadata.csv')
   figs: Set<Path> = files('fig/**')
   supfigs: Set<Path> = files('sup/**')
@@ -59,7 +57,7 @@ process Annotate {
 }
 
 process GetRawCount {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '16GB'
   time '1h'
@@ -81,7 +79,7 @@ process GetRawCount {
 }
 
 process GetSplitMeta {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '4GB'
   time '15m'
@@ -103,7 +101,7 @@ process GetSplitMeta {
 }
 
 process SplitATACBam {
-  module 'samtools/intel/1.20'
+  conda 'samtools'
   cpus '1'
   memory '1GB'
   time '2h'
@@ -126,7 +124,7 @@ process SplitATACBam {
 
 process SplitGexBam {
   cpus '1'
-  memory '10GB'
+  memory '16GB'
   time '4h'
 
   input:
@@ -142,7 +140,7 @@ process SplitGexBam {
 }
 
 process GetATACbw {
-  module 'deeptools/3.5.0:samtools/intel/1.20'
+  conda 'deeptools samtools'
   cpus '4'
   memory '8GB'
   time '2h'
@@ -162,18 +160,18 @@ process GetATACbw {
   samtools sort -@ ${task.cpus} ${bam.baseName}_s.bam -o ${bam.baseName}_sorted.bam
   samtools index ${bam.baseName}_sorted.bam
   bamCoverage -b ${bam.baseName}_sorted.bam -o ${bam.baseName}_s.bw \
-    -p ${task.cpus} \
+    -p ${task.cpus} --samFlagExclude 1024 \
     --Offset 1 --binSize ${params.binsize} --normalizeUsing CPM \
     --ignoreForNormalization Y dmel_mitochondrion_genome
   bamCoverage -b ${bam.baseName}_sorted.bam -o ${bam.baseName}_e.bw \
-    -p ${task.cpus} \
+    -p ${task.cpus} --samFlagExclude 1024 \
     --Offset -1 --binSize ${params.binsize} --normalizeUsing CPM \
     --ignoreForNormalization Y dmel_mitochondrion_genome
   """
 }
 
 process GetGEXbw {
-  module 'deeptools/3.5.0:samtools/intel/1.20'
+  conda 'deeptools samtools'
   cpus '1'
   memory '8GB'
   time '1h'
@@ -194,7 +192,7 @@ process GetGEXbw {
 }
 
 process AvgGEXbw {
-  conda 'deeptools==3.5.6'
+  conda 'deeptools=3.5.6'
   cpus '1'
   memory '2GB'
   time '30m'
@@ -215,7 +213,7 @@ process AvgGEXbw {
 }
 
 process AvgATACbw {
-  conda 'deeptools==3.5.6'
+  conda 'deeptools=3.5.6'
   cpus '1'
   memory '2GB'
   time '30m'
@@ -236,7 +234,7 @@ process AvgATACbw {
 }
 
 process FeatureSelection {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '32GB'
   time '4h'
@@ -302,8 +300,6 @@ workflow {
 
   publish:
   wobj = cn_ch.wobj
-  onobj = cn_ch.onobj
-  offobj = cn_ch.offobj
   fig_f2 = cn_ch.figs.flatten()
   sup_s2 = cn_ch.supfigs.flatten()
   raw_count = raw_cmat_ch
@@ -313,16 +309,6 @@ workflow {
 
 output {
   wobj {
-    path { f ->
-      f >> "int/objects/${f.name}"
-    }
-  }
-  onobj {
-    path { f ->
-      f >> "int/objects/${f.name}"
-    }
-  }
-  offobj {
     path { f ->
       f >> "int/objects/${f.name}"
     }

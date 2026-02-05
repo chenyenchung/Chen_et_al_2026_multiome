@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 library(R.utils)
+options(future.globals.maxSize = 1024 ^ 3)
 
 args <- commandArgs(trailingOnly = TRUE, asValues = TRUE)
 
@@ -45,14 +46,14 @@ obj <- SCTransform(obj,
                    vars.to.regress = "percent.mt",
                    residual.features = g,
                    return.only.var.genes = FALSE)
-obj <- RunPCA(obj, npcs = 250, assay = "SCT")
+obj <- RunPCA(obj, npcs = 400, assay = "SCT")
 obj <- RunHarmony(
   obj, group.by.vars = "library", reduction.use = "pca", reduction.save = "hpca"
 )
 
 DefaultAssay(obj) <- "ATAC"
 obj <- RunTFIDF(obj)
-obj <- RunSVD(obj, features = p, n = 250, assay = "ATAC")
+obj <- RunSVD(obj, features = p, n = 400, assay = "ATAC")
 obj <- RunHarmony(
   obj, group.by.vars = "library", reduction.use = "lsi",
   reduction.save = "hlsi", project.dim = FALSE

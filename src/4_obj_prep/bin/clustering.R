@@ -6,7 +6,7 @@ args <- commandArgs(trailingOnly = TRUE, asValues = TRUE)
 if (interactive()) {
   args$proot <- "/scratch/ycc520/thesis"
   args$obj <-"int/objects/filtered_wnn.rds"
-  args$resolution <- "1.1"
+  args$resolution <- "2.0"
 }
 
 stopifnot(
@@ -34,7 +34,7 @@ obj <- readRDS(args$obj)
 obj <- FindMultiModalNeighbors(
   obj, reduction.list = list("hpca", "hlsi"),
   # Selected by Jaccard Similarity Stability
-  dims.list = list(1:120, 1:110)
+  dims.list = list(1:120, 1:200)
 )
 
 # Resolution QC: Eigen Gap
@@ -78,7 +78,7 @@ while (!single_community) {
 
 # Resolution sweep
 obj <- FindClusters(
-  obj, resolution = seq(0.1, 1.2, 0.05), graph.name = "wsnn"
+  obj, resolution = seq(0.1, 3, 0.05), graph.name = "wsnn"
 )
 
 # Ensure symmetric before graph Laplacian-based QC
@@ -119,7 +119,9 @@ if (isSymmetric(A)) {
     labs(
       y = "Eigengap\n(lambda[k + 1]-lambda[k])"
     ) +
-    geom_vline(xintercept = 36) +
+    geom_vline(
+      xintercept = length(unique(obj[[]][[paste0("wsnn_res.", args$resolution)]]))
+    ) +
     theme_classic() +
     theme(
       axis.title.x = element_blank()
@@ -164,10 +166,13 @@ p3 <- sil_dt[
       ymax = avg_score + sd_score
     )
   ) +
-  geom_vline(xintercept = 1.1) +
+  geom_vline(xintercept = as.numeric(args$resolution)) +
   scale_color_viridis_d() +
   theme_classic() +
-  labs(color = "# of Dim\n(Graph Laplacian)") +
+  labs(
+    x = "Cluster resolution",
+    color = "# of Dim\n(Graph Laplacian)"
+  ) +
   facet_grid(k ~ ., scales = "free_y")
 ggsave("graph_lapacian_silhouette.pdf", p3, height = 12, width = 6)
 

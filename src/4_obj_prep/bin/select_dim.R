@@ -52,7 +52,7 @@ plan(multisession, workers = as.integer(args$ncpus))
 
 obj <- readRDS(args$obj)
 dim_step <- 5
-dim_vec <- seq(from = 50, to = 250, by = dim_step)
+dim_vec <- seq(from = 50, to = 400, by = dim_step)
 
 # GEX: Harmony-corrected PCA
 hpca <- obj@reductions$hpca@cell.embeddings

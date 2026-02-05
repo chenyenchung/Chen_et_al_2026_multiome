@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 library(R.utils)
+options(future.globals.maxSize = 1024 ^ 3)
 
 args <- commandArgs(trailingOnly = TRUE, asValues = TRUE)
 

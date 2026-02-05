@@ -2,20 +2,21 @@
 params.root = '/scratch/ycc520/thesis'
 params.bam = '/scratch/ycc520/thesis/data/bam_new'
 params.libs = ['stf_2', 'stf_3', 'stf_4', 'stf_5']
-params.gtf = '/scratch/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
-params.fai = '/scratch/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa.fai'
+params.gtf = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
+params.fai = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa.fai'
 params.demux = '/scratch/ycc520/thesis/int/demux/'
 params.freemux = '/scratch/ycc520/thesis/int/freemux/'
 params.cbcdir = '/scratch/ycc520/thesis/int/permissive_cbc'
 params.mkrds = '/scratch/ycc520/thesis/data/NN_asset/MarkersNNP15.rds'
-params.img = '/scratch/cgsb/desplan/File_exchange/Yen_ref/image'
+params.img = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/image'
 params.anno = '/scratch/ycc520/thesis/static/ozel_2020_lut.csv'
 params.multivi = '/scratch/ycc520/thesis/src/4_obj_prep/bin/run_multivi.py'
 params.scvi = '/scratch/ycc520/thesis/src/4_obj_prep/bin/run_scvi.py'
 params.peakvi = '/scratch/ycc520/thesis/src/4_obj_prep/bin/run_peakvi.py'
+params.blacklist = '/scratch/ycc520/thesis/static/dm6-blacklist.v2.bed.gz'
 
 process GetPrelimPeaks {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -34,7 +35,7 @@ process GetPrelimPeaks {
 }
 
 process FilterFragments {
-  module 'bedtools/intel/2.29.2:samtools/intel/1.20'
+  conda 'bedtools samtools'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -57,9 +58,9 @@ process FilterFragments {
 }
 
 process MakeObject {
-  module 'r/gcc/4.5.0'
-  cpus '1'
-  memory '16GB'
+  module 'r/4.5.1'
+  cpus '2'
+  memory '32GB'
   time '1h'
 
   publishDir 'int/objects', mode: 'copy'
@@ -83,15 +84,16 @@ process MakeObject {
     --data ${data} \
     --demux ${demux} \
     --freemux ${freemux} \
+    --blacklist ${params.blacklist} \
     --out base_obj.rds
   """
 }
 
 process FeatureSelection {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
-  memory '48GB'
-  time '8h'
+  memory '32GB'
+  time '3h'
 
   publishDir 'int/hvg_init', mode: 'copy'
 
@@ -111,7 +113,7 @@ process FeatureSelection {
 }
 
 process ExtractMat {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '16GB'
   time '30m'
@@ -132,9 +134,9 @@ process ExtractMat {
 }
 
 process NnPredict {
-  cpus '4'
+  cpus '2'
   memory '48GB'
-  time '1h'
+  time '30m'
   publishDir 'int/', mode: 'copy'
 
   input:
@@ -153,10 +155,10 @@ process NnPredict {
 }
 
 process AnnotateObject {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '2'
-  memory '48GB'
-  time '2h'
+  memory '32GB'
+  time '30m'
   publishDir 'int/objects', mode: 'copy'
 
   input:
@@ -181,9 +183,9 @@ process AnnotateObject {
 }
 
 process FormatFragment {
-  module 'samtools/intel/1.20'
+  conda 'samtools'
   cpus '1'
-  memory '6GB'
+  memory '4GB'
   time '30m'
 
   input:
@@ -205,9 +207,9 @@ process FormatFragment {
 }
 
 process ManualSubset {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
-  memory '48GB'
+  memory '32GB'
   time '1h'
   publishDir 'int/objects', mode: 'copy'
 
@@ -228,9 +230,9 @@ process ManualSubset {
 }
 
 process ExtractBarcode {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
-  memory '16GB'
+  memory '24GB'
   time '15m'
 
   input:
@@ -248,7 +250,7 @@ process ExtractBarcode {
 }
 
 process FilterClusterFragments {
-  module 'samtools/intel/1.20'
+  conda 'samtools'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -270,7 +272,7 @@ process FilterClusterFragments {
 }
 
 process MergeClusterFragments {
-  module 'samtools/intel/1.20'
+  conda 'samtools'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -290,10 +292,10 @@ process MergeClusterFragments {
 }
 
 process ClusterPeak {
-  module 'macs2/intel/2.2.7.1'
+  conda 'python=2.7 macs2'
   cpus '1'
   memory '8GB'
-  time '30m'
+  time '1h'
 
   input:
   tuple val(cluster), file(ins)
@@ -363,7 +365,7 @@ process GreedyConsensusPeak {
 }
 
 process PileBarcode {
-  module 'bedtools/intel/2.29.2:samtools/intel/1.20'
+  conda 'bedtools samtools'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -382,7 +384,7 @@ process PileBarcode {
 }
 
 process QuantifyFragments {
-  module 'bedtools/intel/2.29.2:samtools/intel/1.20'
+  conda 'bedtools samtools'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -404,9 +406,9 @@ process QuantifyFragments {
 }
 
 process MakeIntermediateObject {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
-  memory '16GB'
+  memory '32GB'
   time '1h'
 
   publishDir 'int/objects', mode: 'copy'
@@ -431,15 +433,16 @@ process MakeIntermediateObject {
     --data ${data} \
     --demux ${demux} \
     --freemux ${freemux} \
+    --blacklist ${params.blacklist} \
     --meta ${meta} \
     --out filtered_obj.rds
   """
 }
 
 process FeatureSelectionNP {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
-  memory '48GB'
+  memory '36GB'
   time '4h'
 
   publishDir 'int/hvg_np', mode: 'copy'
@@ -460,7 +463,7 @@ process FeatureSelectionNP {
 }
 
 process MakeInsertionFileNP {
-  module 'samtools/intel/1.20'
+  conda 'samtools'
   cpus '1'
   memory '6GB'
   time '30m'
@@ -485,7 +488,7 @@ process MakeInsertionFileNP {
 }
 
 process MakeWNNObject {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '2'
   memory '36GB'
   time '1h'
@@ -509,7 +512,7 @@ process MakeWNNObject {
 }
 
 process MatrixExtSCVI {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '12GB'
   time '30m'
@@ -563,7 +566,7 @@ process RunMultiVI {
 
   script:
   """
-  DEP_PREFIX="/scratch/cgsb/desplan/File_exchange/Yen_ref"
+  DEP_PREFIX="/projects/rps/cgsb/desplan/File_exchange/Yen_ref"
   IMAGE_PREFIX="\${DEP_PREFIX}/image"
   OVERLAY_PREFIX="\${DEP_PREFIX}/overlay"
 
@@ -593,7 +596,7 @@ process RunSCVI {
 
   script:
   """
-  DEP_PREFIX="/scratch/cgsb/desplan/File_exchange/Yen_ref"
+  DEP_PREFIX="/projects/rps/cgsb/desplan/File_exchange/Yen_ref"
   IMAGE_PREFIX="\${DEP_PREFIX}/image"
   OVERLAY_PREFIX="\${DEP_PREFIX}/overlay"
 
@@ -622,7 +625,7 @@ process RunPeakVI {
 
   script:
   """
-  DEP_PREFIX="/scratch/cgsb/desplan/File_exchange/Yen_ref"
+  DEP_PREFIX="/projects/rps/cgsb/desplan/File_exchange/Yen_ref"
   IMAGE_PREFIX="\${DEP_PREFIX}/image"
   OVERLAY_PREFIX="\${DEP_PREFIX}/overlay"
 
@@ -637,7 +640,7 @@ process RunPeakVI {
 }
 
 process SelectDim {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '16'
   memory '12GB'
   time '2h'
@@ -663,7 +666,7 @@ process SelectDim {
 }
 
 process Cluster {
-  module 'r/gcc/4.5.0'
+  module 'r/4.5.1'
   cpus '1'
   memory '16GB'
   time '1h'
@@ -684,7 +687,7 @@ process Cluster {
   """
   clustering.R --proot ${params.root} \
     --obj ${obj} \
-    --resolution 1.1
+    --resolution 2
   """
 }
 

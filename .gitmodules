@@ -4,3 +4,6 @@
 [submodule "extern/scbamop"]
 	path = extern/scbamop
 	url = git@github.com:chenyenchung/scbamop.git
+[submodule "extern/scBasset"]
+	path = extern/scBasset
+	url = git@github.com:calico/scBasset.git

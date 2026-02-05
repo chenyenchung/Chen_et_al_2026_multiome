@@ -49,7 +49,7 @@ DimRasPlot <- function(
 ggsave_sep <- function(
     plot, filename,
     width = NULL, height = NULL, limitsize = FALSE
-    ) {
+) {
   legendsp <- cowplot::get_plot_component(plot, "guide-box", return_all = TRUE)
   plot <- plot + theme(legend.position="none")
   
@@ -91,6 +91,7 @@ class_plot <- AggregateExpression(
   ),
   return.seurat = TRUE
 )
+
 class_plot <- NormalizeData(class_plot)
 class_plot <- ScaleData(class_plot)
 class_dt <- data.frame(LayerData(class_plot, layer = "scale.data"))
@@ -125,47 +126,54 @@ class_mk_hm <- class_dt[
   scale_fill_gradient2(low = "#00441B", mid = "#F7F7F7", high = "#40004B")
 
 class_lut <- c(
-  "20" = "LPC",
-  "15" = "NE",
-  "2" = "NB",
+  "16" = "LPC",
+  "11" = "NE",
+  "14" = "glia",
+  "41" = "glia",
+  "3" = "NB",
   "4" = "NB",
   "0" = "GMC",
   "1" = "GMC",
   "9" = "GMC",
-  "5" = "GMC",
-  "17" = "GMC",
-  "30" = "GMC",
-  "10" = "neuron",
-  "3" = "neuron",
-  "34" = "neuron",
-  "19" = "neuron",
-  "31" = "neuron",
-  "27" = "neuron",
+  "6" = "GMC",
   "25" = "neuron",
-  "12" = "neuron",
-  "8" = "neuron",
-  "7" = "neuron",
-  "14" = "neuron",
-  "26" = "neuron",
+  "34" = "neuron",
+  "10" = "neuron",
   "32" = "neuron",
-  "23" = "neuron",
-  "6" = "neuron",
-  "33" = "neuron",
-  "18" = "neuron",
-  "21" = "neuron",
-  "11" = "neuron",
-  "24" = "neuron",
-  "16" = "neuron",
-  "22" = "neuron",
-  "28" = "neuron",
-  "29" = "neuron",
   "35" = "neuron",
-  "13" = "neuron"
+  "40" = "neuron",
+  "31" = "neuron",
+  "24" = "neuron",
+  "39" = "neuron",
+  "30" = "neuron",
+  "38" = "neuron",
+  "42" = "neuron",
+  "26" = "neuron",
+  "8" = "neuron",
+  "36" = "neuron",
+  "12" = "neuron",
+  "2" = "neuron",
+  "22" = "neuron",
+  "21" = "neuron",
+  "19" = "neuron",
+  "13" = "neuron",
+  "37" = "neuron",
+  "33" = "neuron",
+  "23" = "neuron",
+  "20" = "neuron",
+  "29" = "neuron",
+  "5" = "neuron",
+  "18" = "neuron",
+  "28" = "neuron",
+  "7" = "neuron",
+  "17" = "neuron",
+  "15" = "neuron",
+  "27" = "neuron"
 )
 
 obj@meta.data$class <- factor(
   class_lut[as.character(Idents(obj))],
-  levels = c("NE", "NB", "GMC", "neuron", "LPC")
+  levels = c("NE", "NB", "GMC", "neuron", "LPC", "glia")
 )
 
 p_class <- DimRasPlot(obj, group.by = "class") +
@@ -175,106 +183,58 @@ p_class <- DimRasPlot(obj, group.by = "class") +
       "NB" = "#D95F02",
       "GMC" = "#7570B3",
       "neuron" = "#66A61E",
-      "LPC" = "#E7298A"
+      "LPC" = "#E7298A",
+      "glia" = "#A6761D"
     )
   ) +
   labs(color = "Cell Class") +
   theme(plot.title = element_blank())
 
-# Broad classes: Pooling NE, NB, and GMC
-bclass_lut <- c(
-  "20" = "LPC",
-  "15" = "progenitor",
-  "2" = "progenitor",
-  "4" = "progenitor",
-  "0" = "progenitor",
-  "1" = "progenitor",
-  "9" = "progenitor",
-  "5" = "progenitor",
-  "17" = "progenitor",
-  "30" = "progenitor",
-  "3" = "neuron",
-  "10" = "neuron",
-  "34" = "neuron",
-  "19" = "neuron",
-  "31" = "neuron",
-  "27" = "neuron",
-  "25" = "neuron",
-  "12" = "neuron",
-  "8" = "neuron",
-  "7" = "neuron",
-  "14" = "neuron",
-  "26" = "neuron",
-  "32" = "neuron",
-  "23" = "neuron",
-  "6" = "neuron",
-  "33" = "neuron",
-  "18" = "neuron",
-  "21" = "neuron",
-  "11" = "neuron",
-  "24" = "neuron",
-  "16" = "neuron",
-  "22" = "neuron",
-  "28" = "neuron",
-  "29" = "neuron",
-  "35" = "neuron",
-  "13" = "neuron"
-)
-obj@meta.data$bclass <- factor(
-  bclass_lut[as.character(Idents(obj))],
-  levels = c("progenitor", "neuron", "LPC")
-)
-
-p_bclass <- DimRasPlot(obj, group.by = "bclass") +
-  scale_color_manual(
-    values = c(
-      "progenitor" = "#E6AB02",
-      "neuron" = "#66A61E",
-      "LPC" = "#E7298A"
-    )
-  ) +
-  labs(color = "Broad Class") +
-  theme(plot.title = element_blank())
-
-# Notch status: Using Ap as a proxy, but cluster 24 is an exception.
-# Cite Coyne et al. 2025.
+# Notch status: Using Ap as a proxy.
 n_lut <- c(
-  "20" = NA,
-  "15" = NA,
-  "2" = NA,
+  "16" = NA,
+  "11" = NA,
+  "14" = NA,
+  "41" = NA,
+  "3" = NA,
   "4" = NA,
   "0" = NA,
   "1" = NA,
   "9" = NA,
-  "5" = NA,
-  "17" = NA,
-  "30" = NA,
-  "10" = "On",
-  "3" = "On",
+  "6" = NA,
+  "25" = "Off",
   "34" = "Off",
-  "19" = "Off",
-  "31" = "Off",
-  "27" = "Off",
-  "25" = "On",
-  "12" = "On",
-  "8" = "On",
-  "7" = "On",
-  "14" = "On",
-  "26" = "Off",
+  "10" = "On",
   "32" = "Off",
-  "23" = "On",
-  "6" = "On",
-  "33" = "On",
-  "18" = "Off",
-  "21" = "Off",
-  "11" = "On",
-  "24" = "On",
-  "16" = "Off",
-  "22" = "Off",
-  "28" = "Off",
-  "29" = "Off",
   "35" = "Off",
-  "13" = "Off"
+  "40" = "On",
+  "31" = "Off",
+  "24" = "On",
+  "39" = "On",
+  "30" = "On",
+  "38" = "Off",
+  "42" = "Off",
+  "26" = "Off",
+  "8" = "On",
+  "36" = "On",
+  "12" = "On",
+  "2" = "On",
+  "22" = "Off",
+  "21" = "Off",
+  "19" = "On",
+  "13" = "Off",
+  "37" = "Off",
+  "33" = "Off",
+  "23" = "Off",
+  "20" = "On",
+  "29" = "On",
+  "5" = "On",
+  "18" = "On",
+  "28" = "On",
+  "7" = "Off",
+  "17" = "Off",
+  "15" = "On",
+  "27" = "Off"
 )
 
 obj@meta.data$notch_status <- factor(
@@ -356,42 +316,49 @@ conc_mk_hm <- conc_dt[
   )
 
 t_lut <- c(
-  "20" = NA, # Tll -- LPC
-  "15" = NA, # Hth, Tll -- Lateral OPC NE
-  "2" = "D/B-H1", # D, B-H1, Tll
-  "4" = "Opa/Erm", # Opa, erm, (some Hth) but also Hbn and Ey.
-  "0" = "Slp/D", # Ets65A, svp, fd59A
-  "1" = "Erm/Ey", # Ey, erm (Also Opa), but also slp
-  "9" = "Hbn/Opa/Slp", # Slp, opa
-  "5" = "Ey/Hbn", # Ey, Hbn, but also have Erm
-  "17" = "Hbn/Opa/Slp", # Vvl, tj, fkh, opa, hbn
-  "30" = "D/B-H1", # Svp, B-H1
-  "10" = "Hth", # Hth
-  "3" = "Hth/Opa", # Svp, Erm (Also Hbn/Opa/Slp -- likely Tm1/4/2/6)
-  "34" = "Opa/Erm", # Tup, D (without Ey), Lim3
-  "19" = "Slp/D", # Ets65A, fd95A, Dll, Svp (Cluster 138/ (new 212)?)
-  "31" = "Slp/D", # Hbn, Ets65A, tup (Dm3?)
-  "27" = "D/B-H1", # Ets65A, fd95A, Dll (Dm2 and Mi15?)
-  "25" = "D/B-H1", # Ets65A, TfAP-2 (Cluster 24 / new 50, 75, 76, 77, 256)
-  "12" = "Slp/D", # Svp, Ets65A
-  "8" = "Hbn/Opa/Slp", # Toy, Sox102F, might also have Slp/D?
-  "7" = "Hbn/Opa/Slp", # Toy, Sox102F, might also have Slp/D? (TmY4, Tm5ab, Tm25...)
-  "14" = "Slp/D", # Toy, Sox102F, D (Might also have Hbn/Opa/Slp; Tm5Y, cluster 76)
-  "26" = "Hbn/Opa/Slp", # vvl, tj, fkh, fd59A (Dm8/Dm11/DRA-Dm)
-  "32" = "Hbn/Opa/Slp", # fkh, hbn, tj (Lpi4-3)
-  "23" = "Hth", # Hth, Bsh (Mi1)
-  "6" = "Hth/Opa", # Erm / TfAP-2 (Tm1/2/4/6)
-  "33" = "Hth", # Dimm, Bsh, TfAP-2 -- this is probably a mix of Hth - Erm/Ey (TEs)
-  "18" = "Erm/Ey", # Ey, Kn, Lim3 (Tm29?)
-  "21" = "Opa/Erm", # Lim3, Tup, D (No Ey & Kn) (Mi9)
-  "11" = "Erm/Ey", # Erm, vvl (Tm27(Y), TmY8, Mi10)
+  "16" = NA, # Tll/dac -- LPC
+  "11" = NA, # hth/tll/dac -- lateral OPC NE
+  "14" = NA, # lamina glia
+  "41" = NA, # lamina glia
+  "3" = "Erm/Ey", # Opa, erm, (some Hth) but also Hbn and Ey.
+  "4" = "Slp/D", # Slp1/Slp2/D
+  "0" = "Ey/Hbn", # Hbn and Ey but also Opa and erm.
+  "1" = "D/B-H1", # Slp1/Slp2/D/B-H1
+  "9" = "Slp/D", # Slp1/Slp2/D/B-H1
+  "6" = "Hbn/Opa/Slp", # Ey/Hbn/Opa
+  "25" = "Hth/Opa", # Hth/Opa/Run
+  "34" = "D/B-H1", # Ets65A, fd95A, oc (T1?)
+  "10" = "Slp/D", # Toy, Sox102F, D (Might also have Hbn/Opa/Slp; Tm5Y, cluster 76)
+  "32" = "Hth", # Svp, TfAP-2, Hth (Cluster 180?)
+  "35" = "Hbn/Opa/Slp", # kn, toy, tj (TmY14, MeSps)
+  "40" = "D/B-H1", # Ets65A, TfAP-2 (Cluster 24 / new 50, 75, 76, 77, 256)
+  "31" = "Hbn/Opa/Slp", # vvl, tj, fkh, fd59A (Dm8/Dm11/DRA-Dm)
   "24" = "Erm/Ey", # Vvl, Dac (Tm9)
-  "16" = "Hth/Opa", # Run, (also Ey, Tup, D) (Mi4, Pm4)
-  "22" = "Ey/Hbn", # tup, ey, toy (Cluster 173, 181, Dm10)
-  "28" = "Hth", # Svp, TfAP-2, Hth (Cluster 180?)
-  "29" = "Hbn/Opa/Slp", # kn, toy, tj (TmY14, MeSps)
-  "35" = "Hbn/Opa/Slp", # fkh, oc, hbn (Dm9, Lai)
-  "13" = "D/B-H1" # Ets65A, fd95A, oc (T1?)
+  "39" = "Hth", # Dimm, Bsh, TfAP-2 -- this is probably a mix of Hth - Erm/Ey (TEs)
+  "30" = "Hth/Opa", # Erm / TfAP-2 (Tm1/2/4/6)
+  "38" = "Hbn/Opa/Slp", # Vvl, tj, fkh, opa, hbn (LPi4-3?)
+  "42" = "Hbn/Opa/Slp", # fkh, oc, hbn, fd59A (Dm9, Lai)
+  "26" = "Ey/Hbn", # Ey/Tup/Lim3 (Dm10?)
+  "8" = "Hbn/Opa/Slp", # Toy, Sox102F, might also have Slp/D? (TmY4, Tm5ab, Tm25...)
+  "36" = "Erm/Ey", # Erm, vvl (Tm27(Y), TmY8, Mi10)
+  "12" = "Erm/Ey", # Erm, vvl (Tm27(Y), TmY8, Mi10)
+  "2" = "Hth/Opa", # Erm / TfAP-2 (Tm1/2/4/6)
+  "22" = "Opa/Erm", # Tup, D (without Ey), Lim3 (Mi9)
+  "21" = "Hth/Opa", # Run, (also Ey, Tup, D) (Mi4, Pm4)
+  "19" = "Hbn/Opa/Slp", # Toy, Sox102F, might also have Slp/D? (TmY4, Tm5ab, Tm25...)
+  "13" = "Erm/Ey", # Ey, Kn, Lim3 (Tm29?)
+  "37" = "Slp/D", # Hbn, Ets65A, tup (Dm3?)
+  "33" = "D/B-H1", # Ets65A, fd95A, Dll (Dm2 and Mi15?)
+  "23" = "D/B-H1", # Ets65A, fd95A, oc (T1?)
+  "20" = "Hth", # Hth, Bsh (Mi1)
+  "29" = "Hth/Opa", # Hth/Run/Bsh
+  "5" = "Hbn/Opa/Slp", # vvl, tj, fkh, fd59A (Dm8/Dm11/DRA-Dm)
+  "18" = "Opa/Erm", # Tup, D (without Ey), Lim3 (Mi9) (Could have Mi4/Pm4 as well)
+  "28" = "D/B-H1", # Ets65A/Dll/Svp
+  "7" = "Slp/D", # Dll, fd59A, Ets65A (Cluster 138?)
+  "17" = "Hbn/Opa/Slp", # vvl, tj, fkh, fd59A (Dm8/Dm11/DRA-Dm)
+  "15" = "Hbn/Opa/Slp", # toy/Sox102F
+  "27" = "D/B-H1" # fd59A, oc, B-H1
 )
 
 obj@meta.data$temporal_identity <- factor(
@@ -433,7 +400,6 @@ if (!dir.exists("obj")) {
 }
 
 ggsave_sep(p_class, file.path("fig", "class.pdf"), width = 5, height = 4)
-ggsave_sep(p_bclass, file.path("sup", "broad_class.pdf"), width = 5, height = 4)
 ggsave_sep(p_nstat, file.path("fig", "notch_status.pdf"), width = 5, height = 4)
 ggsave_sep(p_tid, file.path("fig", "temporal_identity.pdf"), width = 5, height = 4)
 ggsave_sep(p_sori, file.path("fig", "spatial_origin.pdf"), width = 5, height = 4)
@@ -459,7 +425,6 @@ ins_list <- list.files("./", pattern = "\\.tsv\\.gz$")
 names(ins_list) <- vapply(ins_list, function(x) {
   return(sub("_all\\.tsv\\.gz$", "", x))
 }, FUN.VALUE = character(1))
-
 
 
 f_list <- lapply(names(ins_list), function(lib) {
@@ -531,19 +496,3 @@ Idents(obj) <- "seurat_clusters"
 
 saveRDS(obj, file.path("obj", "annotated.rds"))
 write.csv(obj@meta.data, "metadata.csv")
-
-on_obj <- subset(obj, idents = c(
-  "15", "2", "4", "0", "1", "9", "5", "17", "30",
-  "10", "3", "25", "12", "8", "7", "14", "23", "6", "33", "11", "24"
-))
-saveRDS(on_obj, file.path("obj", "non_obj.rds"))
-rm(on_obj)
-gc()
-
-Idents(obj) <- "seurat_clusters"
-off_obj <- subset(obj, idents = c(
-  "15", "2", "4", "0", "1", "9", "5", "17", "30",
-  "34", "19", "31", "27", "26", "32", "18", "21",
-  "16", "22", "28", "29", "35", "13"
-))
-saveRDS(off_obj, file.path("obj", "noff_obj.rds"))
