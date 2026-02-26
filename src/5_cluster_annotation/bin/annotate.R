@@ -42,7 +42,7 @@ DimRasPlot <- function(
   p <- plot_df |>
     ggplot(aes(x = dim_1, y = dim_2, color = .data[[group.by]])) +
     geom_point_rast(size = pt.size) +
-    guides(color = guide_legend(override.aes = list(size = 6))) +
+    guides(color = guide_legend(override.aes = list(size = 4))) +
     theme_void()
   return(p)
 }
