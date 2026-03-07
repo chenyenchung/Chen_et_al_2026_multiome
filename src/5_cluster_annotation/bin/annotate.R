@@ -179,12 +179,12 @@ obj@meta.data$class <- factor(
 p_class <- DimRasPlot(obj, group.by = "class") +
   scale_color_manual(
     values = c(
-      "NE" = "#1B9E77",
-      "NB" = "#D95F02",
-      "GMC" = "#7570B3",
-      "neuron" = "#66A61E",
-      "LPC" = "#E7298A",
-      "glia" = "#A6761D"
+      "NE" = "#E41A1C",
+      "NB" = "#377EB8",
+      "GMC" = "#4DAF4A",
+      "neuron" = "#984EA3",
+      "LPC" = "#FF7F00",
+      "glia" = "#FFFF33"
     )
   ) +
   labs(color = "Cell Class") +
