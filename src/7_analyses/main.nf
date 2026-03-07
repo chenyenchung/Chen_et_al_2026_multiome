@@ -70,12 +70,36 @@ process RunXSTREME {
   """
 }
 
+process Fig2ISS {
+  module 'r/4.5.1'
+  cpus '1'
+  memory '16GB'
+  time '30m'
+
+  input:
+  obj: Path
+
+  output:
+  sch: Set<Path> = files("fig/f2/A_*.pdf")
+  iss_st: Path = file('fig/f2/clsi_spatial_vs_temporal.pdf')
+  iss_st_tbl: Path = file('tbl/clsi_spatial_vs_temporal.csv')
+  iss_sc: Path = file('sup_fig/s2/clsi_spatial_over_class.pdf')
+  iss_sc_tbl: Path = file('tbl/clsi_spatial_over_class.csv')
+
+  script:
+  """
+  fig2_ISS.R --proot ${params.root} \
+    --obj ${obj}
+  """
+}
+
 workflow {
 
   main:
   de_ch = RunDE(file(params.obj))
   bed_ch = GetDARbed(de_ch.sdar).flatten()
   xstr_ch = RunXSTREME(bed_ch)
+  f2_iss_ch = Fig2ISS(file(params.obj))
 
   publish:
   id_deg = de_ch.ideg
@@ -83,22 +107,22 @@ workflow {
   sp_deg = de_ch.sdeg
   sp_dar = de_ch.sdar
   xstreme = xstr_ch
+  f2_sch = f2_iss_ch.sch
+  f2_iss_st = f2_iss_ch.iss_st
+  f2_iss_st_tbl = f2_iss_ch.iss_st_tbl
+  f2_iss_sc = f2_iss_ch.iss_sc
+  f2_iss_sc_tbl = f2_iss_ch.iss_sc_tbl
 }
 
 output {
-  id_deg {
-    path 'result/'
-  }
-  id_dar {
-    path 'result/'
-  }
-  sp_deg {
-    path 'result/'
-  }
-  sp_dar {
-    path 'result/'
-  }
-  xstreme {
-    path 'result/'
-  }
+  id_deg {}
+  id_dar {}
+  sp_deg {}
+  sp_dar {}
+  xstreme {}
+  f2_sch {}
+  f2_iss_st {}
+  f2_iss_st_tbl {}
+  f2_iss_sc {}
+  f2_iss_sc_tbl {}
 }
