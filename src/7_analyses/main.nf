@@ -92,6 +92,30 @@ process Fig2ISS {
     --obj ${obj}
   """
 }
+process Fig2DECount {
+  module 'r/4.5.1'
+  cpus '1'
+  memory '8GB'
+  time '30m'
+
+  input:
+  dar: Path
+  deg: Path
+
+  output:
+  deg_st: Path = file('fig/f2/DEG_counts.pdf')
+  deg_g_st: Path = file('fig/f2/DEG_counts_guide.pdf')
+  dar_st: Path = file('fig/f2/DAR_counts.pdf')
+  dar_g_st: Path = file('fig/f2/DAR_counts_guide.pdf')
+  de_sonly: Path = file('sup_fig/s2/spatial_DE_counts.pdf')
+  de_g_sonly: Path = file('sup_fig/s2/spatial_DE_counts_guide.pdf')
+
+  script:
+  """
+  fig2_DE_number.R --proot ${params.root} \
+    --dar ${dar} --deg ${deg}
+  """
+}
 
 workflow {
 
@@ -100,6 +124,7 @@ workflow {
   bed_ch = GetDARbed(de_ch.sdar).flatten()
   xstr_ch = RunXSTREME(bed_ch)
   f2_iss_ch = Fig2ISS(file(params.obj))
+  f2_de_count_ch = Fig2DECount(de_ch.idar, de_ch.ideg)
 
   publish:
   id_deg = de_ch.ideg
@@ -112,17 +137,45 @@ workflow {
   f2_iss_st_tbl = f2_iss_ch.iss_st_tbl
   f2_iss_sc = f2_iss_ch.iss_sc
   f2_iss_sc_tbl = f2_iss_ch.iss_sc_tbl
+  f2_deg_st = f2_de_count_ch.deg_st
+  f2_deg_st_g = f2_de_count_ch.deg_g_st
+  f2_dar_st = f2_de_count_ch.dar_st
+  f2_dar_st_g = f2_de_count_ch.dar_g_st
+  s2_de = f2_de_count_ch.de_sonly
+  s2_de_g = f2_de_count_ch.de_g_sonly
 }
 
 output {
-  id_deg {}
-  id_dar {}
-  sp_deg {}
-  sp_dar {}
-  xstreme {}
-  f2_sch {}
-  f2_iss_st {}
-  f2_iss_st_tbl {}
-  f2_iss_sc {}
-  f2_iss_sc_tbl {}
+  id_deg {
+  }
+  id_dar {
+  }
+  sp_deg {
+  }
+  sp_dar {
+  }
+  xstreme {
+  }
+  f2_sch {
+  }
+  f2_iss_st {
+  }
+  f2_iss_st_tbl {
+  }
+  f2_iss_sc {
+  }
+  f2_iss_sc_tbl {
+  }
+  f2_deg_st {
+  }
+  f2_deg_st_g {
+  }
+  f2_dar_st {
+  }
+  f2_dar_st_g {
+  }
+  s2_de {
+  }
+  s2_de_g {
+  }
 }
