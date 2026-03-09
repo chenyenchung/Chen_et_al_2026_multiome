@@ -135,6 +135,7 @@ process Fig2DARIdeo {
   bi: Path = file('fig/f2/dar_bi.pdf')
   optix: Path = file('sup_fig/s2/dar_optix.pdf')
   dpp: Path = file('sup_fig/s2/dar_dpp.pdf')
+  rx: Path = file('sup_fig/s2/dar_rx.pdf')
 
   script:
   """
@@ -163,6 +164,24 @@ process SFig2QC {
   """
 }
 
+process SFig2UMAP {
+  module 'r/4.5.1'
+  cpus '1'
+  memory '16GB'
+  time '30m'
+
+  input:
+  obj: Path
+
+  output:
+  umap: Path = file('sup_fig/s2/seurat_cluster_umap.pdf')
+
+  script:
+  """
+  fig2_raw_umap.R --proot ${params.root} \
+    --obj ${obj}
+  """
+}
 workflow {
 
   main:
@@ -173,6 +192,7 @@ workflow {
   f2_de_count_ch = Fig2DECount(de_ch.idar, de_ch.ideg)
   f2_ideo_ch = Fig2DARIdeo(de_ch.idar, file(params.gtf))
   fig2_qc_ch = SFig2QC(file(params.obj))
+  fig2_umap_ch = SFig2UMAP(file(params.obj))
 
   publish:
   id_deg = de_ch.ideg
@@ -196,8 +216,10 @@ workflow {
   f2_ideo_bi = f2_ideo_ch.bi
   s2_ideo_optix = f2_ideo_ch.optix
   s2_ideo_dpp = f2_ideo_ch.dpp
+  s2_ideo_rx = f2_ideo_ch.rx
   s2_comp = fig2_qc_ch.comp
   s2_qc = fig2_qc_ch.qc
+  s2_umap = fig2_umap_ch.umap
 }
 
 output {
@@ -243,8 +265,12 @@ output {
   }
   s2_ideo_dpp {
   }
+  s2_ideo_rx {
+  }
   s2_comp {
   }
   s2_qc {
+  }
+  s2_umap {
   }
 }
