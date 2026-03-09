@@ -7,6 +7,7 @@ params.obj = '/scratch/ycc520/thesis/int/objects/annotated.rds'
 params.fasta = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
 params.all_peaks = '/scratch/ycc520/thesis/int/consensus_peaks.bed'
 params.motif = '/scratch/ycc520/thesis/static/CisBPDrosophilaALL.meme'
+params.gtf = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
 
 process RunDE {
   module 'r/4.5.1'
@@ -92,6 +93,7 @@ process Fig2ISS {
     --obj ${obj}
   """
 }
+
 process Fig2DECount {
   module 'r/4.5.1'
   cpus '1'
@@ -117,6 +119,30 @@ process Fig2DECount {
   """
 }
 
+process Fig2DARIdeo {
+  module 'r/4.5.1'
+  cpus '1'
+  memory '8GB'
+  time '30m'
+
+  input:
+  dar: Path
+  gtf: Path
+
+  output:
+  ideo: Path = file('fig/f2/dar_ideo.pdf')
+  vsx: Path = file('fig/f2/dar_Vsx.pdf')
+  bi: Path = file('fig/f2/dar_bi.pdf')
+  optix: Path = file('sup_fig/s2/dar_optix.pdf')
+  dpp: Path = file('sup_fig/s2/dar_dpp.pdf')
+
+  script:
+  """
+  fig2_differential_ideo.R --proot ${params.root} \
+    --dar ${dar} --gtf ${gtf}
+  """
+}
+
 workflow {
 
   main:
@@ -125,6 +151,7 @@ workflow {
   xstr_ch = RunXSTREME(bed_ch)
   f2_iss_ch = Fig2ISS(file(params.obj))
   f2_de_count_ch = Fig2DECount(de_ch.idar, de_ch.ideg)
+  f2_ideo_ch = Fig2DARIdeo(de_ch.idar, file(params.gtf))
 
   publish:
   id_deg = de_ch.ideg
@@ -143,6 +170,11 @@ workflow {
   f2_dar_st_g = f2_de_count_ch.dar_g_st
   s2_de = f2_de_count_ch.de_sonly
   s2_de_g = f2_de_count_ch.de_g_sonly
+  f2_ideo = f2_ideo_ch.ideo
+  f2_ideo_vsx = f2_ideo_ch.vsx
+  f2_ideo_bi = f2_ideo_ch.bi
+  s2_ideo_optix = f2_ideo_ch.optix
+  s2_ideo_dpp = f2_ideo_ch.dpp
 }
 
 output {
@@ -177,5 +209,15 @@ output {
   s2_de {
   }
   s2_de_g {
+  }
+  f2_ideo {
+  }
+  f2_ideo_vsx {
+  }
+  f2_ideo_bi {
+  }
+  s2_ideo_optix {
+  }
+  s2_ideo_dpp {
   }
 }
