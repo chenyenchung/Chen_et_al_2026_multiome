@@ -201,19 +201,26 @@ subset_test <- function(
       labels = c("Vsx", "Bi", "Optix")
     )
   } else if (condition == "temporal_identity") {
-    meta$temporal_identity <- factor(
-      meta$temporal_identity,
-      levels = c(
-        "Hth",
-        "Hth/Opa",
-        "Opa/Erm",
-        "Erm/Ey",
-        "Ey/Hbn",
-        "Hbn/Opa/Slp",
-        "Slp/D",
-        "D/B-H1"
+    if (class != "neuron") {
+      meta$temporal_identity <- factor(
+        meta$temporal_identity,
+        levels = c("Early", "Late")
       )
-    )
+    } else {
+      meta$temporal_identity <- factor(
+        meta$temporal_identity,
+        levels = c(
+          "Hth",
+          "Hth/Opa",
+          "Opa/Erm",
+          "Erm/Ey",
+          "Ey/Hbn",
+          "Hbn/Opa/Slp",
+          "Slp/D",
+          "D/B-H1"
+        )
+      )
+    }
   }
 
   meta$bio_rep <- factor(meta$bio_rep)

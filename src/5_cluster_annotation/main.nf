@@ -103,8 +103,8 @@ process GetSplitMeta {
 process SplitATACBam {
   conda 'samtools'
   cpus '1'
-  memory '1GB'
-  time '2h'
+  memory '2GB'
+  time '4h'
 
   input:
   (lib, bam, meta): Tuple<String, Path, Path>

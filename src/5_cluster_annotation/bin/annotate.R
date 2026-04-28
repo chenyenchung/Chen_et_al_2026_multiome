@@ -320,12 +320,12 @@ t_lut <- c(
   "11" = NA, # hth/tll/dac -- lateral OPC NE
   "14" = NA, # lamina glia
   "41" = NA, # lamina glia
-  "3" = "Erm/Ey", # Opa, erm, (some Hth) but also Hbn and Ey.
-  "4" = "Slp/D", # Slp1/Slp2/D
-  "0" = "Ey/Hbn", # Hbn and Ey but also Opa and erm.
-  "1" = "D/B-H1", # Slp1/Slp2/D/B-H1
-  "9" = "Slp/D", # Slp1/Slp2/D/B-H1
-  "6" = "Hbn/Opa/Slp", # Ey/Hbn/Opa
+  "3" = "Early", # Opa, erm, (some Hth) but also Hbn and Ey.
+  "4" = "Late", # Slp1/Slp2/D
+  "0" = "Early", # Hbn and Ey but also Opa and erm.
+  "1" = "Late", # Slp1/Slp2/D/B-H1
+  "9" = "Late", # Slp1/Slp2/D/B-H1
+  "6" = "Early", # Ey/Hbn/Opa
   "25" = "Hth/Opa", # Hth/Opa/Run
   "34" = "D/B-H1", # Ets65A, fd95A, oc (T1?)
   "10" = "Slp/D", # Toy, Sox102F, D (Might also have Hbn/Opa/Slp; Tm5Y, cluster 76)
@@ -364,7 +364,7 @@ t_lut <- c(
 obj@meta.data$temporal_identity <- factor(
   t_lut[as.character(Idents(obj))],
   levels = c(
-    "Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey", "Ey/Hbn", "Hbn/Opa/Slp",
+    "Early", "Late", "Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey", "Ey/Hbn", "Hbn/Opa/Slp",
     "Slp/D", "D/B-H1"
   )
 )
@@ -378,10 +378,12 @@ p_tid <- DimRasPlot(obj, group.by = "temporal_identity") +
                "Ey/Hbn" = "#82C9C5",
                "Hbn/Opa/Slp" = "#B4C6E6",
                "Slp/D" = "#A6A1CD",
-               "D/B-H1" = "#A46690"),
+               "D/B-H1" = "#A46690",
+               "Early" = "#00441B",
+               "Late" = "#40004B"),
     na.value = "grey80",
     breaks = c(
-      "Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey", "Ey/Hbn", "Hbn/Opa/Slp",
+      "Early", "Late", "Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey", "Ey/Hbn", "Hbn/Opa/Slp",
       "Slp/D", "D/B-H1"
     )
   ) +
