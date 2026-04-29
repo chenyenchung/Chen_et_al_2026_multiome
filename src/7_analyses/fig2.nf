@@ -8,6 +8,7 @@ params.fasta = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Niko
 params.all_peaks = '/scratch/ycc520/thesis/int/consensus_peaks.bed'
 params.motif = '/scratch/ycc520/thesis/static/CisBPDrosophilaALL.meme'
 params.gtf = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
+params.edger_helper = '/scratch/ycc520/thesis/src/7_analyses/bin/edger_ql_helpers.R'
 
 process RunDE {
   module 'r/4.5.1'
@@ -17,6 +18,7 @@ process RunDE {
 
   input:
   obj: Path
+  edger_helper: Path
 
   output:
   ideg: Path = file('de_identity/RNA.csv')
@@ -27,7 +29,8 @@ process RunDE {
   script:
   """
   run_de.R --proot ${params.root} \
-    --obj ${obj}
+    --obj ${obj} \
+    --edger_helper ${edger_helper}
   """
 }
 
@@ -185,7 +188,7 @@ process SFig2UMAP {
 workflow {
 
   main:
-  de_ch = RunDE(file(params.obj))
+  de_ch = RunDE(file(params.obj), file(params.edger_helper))
   bed_ch = GetDARbed(de_ch.sdar).flatten()
   xstr_ch = RunXSTREME(bed_ch)
   f2_iss_ch = Fig2ISS(file(params.obj))
