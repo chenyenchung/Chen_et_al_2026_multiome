@@ -1,15 +1,17 @@
 #!/usr/bin/env nextflow
-nextflow.preview.types = true
+nextflow.enable.types = true
 nextflow.enable.strict = true
 
-params.root = '/scratch/ycc520/thesis'
-params.obj = '/scratch/ycc520/thesis/int/objects/annotated.rds'
-params.varp = '/scratch/ycc520/thesis/int/hvg_np/varp.rds'
-params.fasta = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
-params.sif = '/scratch/ycc520/thesis/static/cuda_11.2.2-cudnn8-devel-ubi8.sif'
-params.ext3 = '/scratch/ycc520/thesis/static/scbasset.ext3'
-params.prep_src = '/scratch/ycc520/thesis/src/6_scBasset/bin/scbasset_preprocess.py'
-params.train_src = '/scratch/ycc520/thesis/src/6_scBasset/bin/scbasset_train.py'
+params {
+  root: String = '/scratch/ycc520/thesis'
+  obj: Path = '/scratch/ycc520/thesis/int/objects/annotated.rds'
+  varp: Path = '/scratch/ycc520/thesis/int/hvg_np/varp.rds'
+  fasta: Path = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
+  sif: Path = '/scratch/ycc520/thesis/static/cuda_11.2.2-cudnn8-devel-ubi8.sif'
+  ext3: Path = '/scratch/ycc520/thesis/static/scbasset.ext3'
+  prep_src: Path = '/scratch/ycc520/thesis/src/6_scBasset/bin/scbasset_preprocess.py'
+  train_src: Path = '/scratch/ycc520/thesis/src/6_scBasset/bin/scbasset_train.py'
+}
 
 process ExtractMatrix {
   module 'r/4.5.1'
@@ -69,7 +71,7 @@ process PrepTrain {
   script: Path
 
   output:
-  processed: Set<Path> = files('processed/')
+  processed: Path = file('processed', type: 'dir')
 
   script:
   """
@@ -89,7 +91,7 @@ process Train {
   clusterOptions '--gres=gpu:1'
 
   input:
-  data: Set<Path>
+  data: Path
   sif: Path
   overlay: Path
   script: Path
@@ -110,16 +112,16 @@ process Train {
 workflow {
 
   main:
-  mat_ch = ExtractMatrix(file(params.obj), file(params.varp))
+  mat_ch = ExtractMatrix(params.obj, params.varp)
   h5ad_ch = MakeH5AD(mat_ch.barcodes, mat_ch.peaks, mat_ch.matrix, mat_ch.meta)
   prep_ch = PrepTrain(
     h5ad_ch,
-    file(params.fasta),
-    file(params.sif),
-    file(params.ext3),
-    file(params.prep_src),
+    params.fasta,
+    params.sif,
+    params.ext3,
+    params.prep_src,
   )
-  train_ch = Train(prep_ch, file(params.sif), file(params.ext3), file(params.train_src))
+  train_ch = Train(prep_ch, params.sif, params.ext3, params.train_src)
 
   publish:
   model = train_ch.flatten()
@@ -129,10 +131,10 @@ workflow {
 output {
   model {
     path { f ->
-      f >> "int/model/${f.name}"
+      f >> "scBasset/${f.name}"
     }
   }
   obj {
-    path "int/model/"
+    path "scBasset/"
   }
 }
