@@ -1,14 +1,16 @@
 #!/usr/bin/env nextflow
-nextflow.preview.types = true
+nextflow.enable.types = true
 nextflow.enable.strict = true
 
-params.root = '/scratch/ycc520/thesis'
-params.obj = '/scratch/ycc520/thesis/int/objects/annotated.rds'
-params.fasta = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
-params.all_peaks = '/scratch/ycc520/thesis/int/consensus_peaks.bed'
-params.motif = '/scratch/ycc520/thesis/static/CisBPDrosophilaALL.meme'
-params.gtf = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
-params.edger_helper = '/scratch/ycc520/thesis/src/7_analyses/bin/edger_ql_helpers.R'
+params {
+  root: String = '/scratch/ycc520/thesis'
+  obj: Path = '/scratch/ycc520/thesis/int/objects/annotated.rds'
+  fasta: Path = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa'
+  all_peaks: Path = '/scratch/ycc520/thesis/int/consensus_peaks.bed'
+  motif: Path = '/scratch/ycc520/thesis/static/CisBPDrosophilaALL.meme'
+  gtf: Path = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
+  edger_helper: Path = '/scratch/ycc520/thesis/src/7_analyses/bin/edger_ql_helpers.R'
+}
 
 process RunDE {
   module 'r/4.5.1'
@@ -188,14 +190,14 @@ process SFig2UMAP {
 workflow {
 
   main:
-  de_ch = RunDE(file(params.obj), file(params.edger_helper))
+  de_ch = RunDE(params.obj, params.edger_helper)
   bed_ch = GetDARbed(de_ch.sdar).flatten()
   xstr_ch = RunXSTREME(bed_ch)
-  f2_iss_ch = Fig2ISS(file(params.obj))
+  f2_iss_ch = Fig2ISS(params.obj)
   f2_de_count_ch = Fig2DECount(de_ch.idar, de_ch.ideg)
-  f2_ideo_ch = Fig2DARIdeo(de_ch.idar, file(params.gtf))
-  fig2_qc_ch = SFig2QC(file(params.obj))
-  fig2_umap_ch = SFig2UMAP(file(params.obj))
+  f2_ideo_ch = Fig2DARIdeo(de_ch.idar, params.gtf)
+  fig2_qc_ch = SFig2QC(params.obj)
+  fig2_umap_ch = SFig2UMAP(params.obj)
 
   publish:
   id_deg = de_ch.ideg
@@ -222,7 +224,7 @@ workflow {
   s2_ideo_rx = f2_ideo_ch.rx
   s2_comp = fig2_qc_ch.comp
   s2_qc = fig2_qc_ch.qc
-  s2_umap = fig2_umap_ch.umap
+  s2_umap = fig2_umap_ch
 }
 
 output {
