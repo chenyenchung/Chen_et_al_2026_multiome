@@ -31,9 +31,12 @@ plot_mkideo <- function(
     spa_gr, tem_gr, ext = 1e5, nlayers = 10, tstep = 0.3, wsize = 5e4,
     saveas = NULL, class_pal = NULL, mode = "density", genes = FALSE,
     gene_size = 0.5, chr = "auto", zoom = NULL, lsize = 1, klwd = 0.01,
-    width = 5, height = 4, density_scale = c("global", "panel")
+    width = 5, height = 4, density_scale = c("global", "panel"),
+    markers = NULL, marker_panel = 1, marker_r0 = 0, marker_r1 = 1,
+    marker_y = 0.75
 ) {
   stopifnot(mode %in% c("density", "region"))
+  stopifnot(is.null(markers) || methods::is(markers, "GRanges"))
   density_scale <- match.arg(density_scale)
   if (is.null(class_pal)) {
     class_pal <- c(
@@ -42,10 +45,22 @@ plot_mkideo <- function(
       "neuron" = "#984EA3"
     )
   }
+  get_marker_labels <- function(markers) {
+    label_col <- intersect(c("labels", "label"), names(mcols(markers)))
+    if (length(label_col) > 0) {
+      return(as.character(mcols(markers)[[label_col[1]]]))
+    }
+    marker_names <- names(markers)
+    if (!is.null(marker_names)) {
+      return(marker_names)
+    }
+    stop("markers must have a 'labels' metadata column or names.")
+  }
   
   .plot <- function(
     spa_gr, tem_gr, ext, nlayers, tstep, wsize, class_pal, mode, genes,
-    gene_size, chr, zoom, klwd, lsize, density_scale
+    gene_size, chr, zoom, klwd, lsize, density_scale, markers, marker_panel,
+    marker_r0, marker_r1, marker_y
   ) {
     pp <- getDefaultPlotParams(plot.type = 3)
     if (genes) {
@@ -176,6 +191,14 @@ plot_mkideo <- function(
       }
       base <- base + 0.3
     }
+
+    if (!is.null(markers) && length(markers) > 0) {
+      kpPlotMarkers(
+        kp, data = markers, labels = get_marker_labels(markers),
+        data.panel = marker_panel, r0 = marker_r0, r1 = marker_r1,
+        y = marker_y, cex = lsize * 0.7
+      )
+    }
     
   }
 
@@ -183,13 +206,15 @@ plot_mkideo <- function(
     pdf(saveas, width = width, height = height)
     .plot(
       spa_gr, tem_gr, ext, nlayers, tstep, wsize, class_pal, mode, genes,
-      gene_size, chr, zoom, klwd, lsize, density_scale
+      gene_size, chr, zoom, klwd, lsize, density_scale, markers, marker_panel,
+      marker_r0, marker_r1, marker_y
     )
     dev.off()
   } else {
     .plot(
       spa_gr, tem_gr, ext, nlayers, tstep, wsize, class_pal, mode, genes,
-      gene_size, chr, zoom, klwd, lsize, density_scale
+      gene_size, chr, zoom, klwd, lsize, density_scale, markers, marker_panel,
+      marker_r0, marker_r1, marker_y
     )
   }
 }
@@ -224,8 +249,20 @@ tem_gr <- unique(tem_gr)
 if (!dir.exists("fig/f2")) dir.create("fig/f2", recursive = TRUE)
 if (!dir.exists("sup_fig/s2")) dir.create("sup_fig/s2", recursive = TRUE)
 
+regions_of_interest <- GRanges(c(
+  "chrX:5510000-5630000",
+  "chrX:4350000-4550000",
+  "chr2R:8020000-8050000",
+  "chr2L:2420000-2470000",
+  "chr2R:20910000-20940000"
+))
+regions_of_interest$label <- c(
+  "Vsx", "Bi", "Optix", "Dpp", "Rx"
+)
+
 plot_mkideo(
   spa_gr, tem_gr, tstep = 0.25, mode = "density",
+  markers = regions_of_interest,
   saveas = file.path("fig", "f2", "dar_ideo.pdf"),
   width = 6, height = 6
 )
