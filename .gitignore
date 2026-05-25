@@ -4,6 +4,7 @@ int
 log
 tmp
 result
+*__pycache__
 *.pdf
 *.html
 *.arrow
