@@ -10,6 +10,9 @@ params {
   motif: Path = '/scratch/ycc520/thesis/static/CisBPDrosophilaALL.meme'
   gtf: Path = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
   edger_helper: Path = '/scratch/ycc520/thesis/src/7_analyses/bin/edger_ql_helpers.R'
+  origin_map: Path = '/scratch/ycc520/thesis/static/origin_map.csv'
+  ozel_obj_dir: Path = '/scratch/ycc520/thesis/static/ozel_2020_obj'
+  ozel_clsi_dims: Integer = 120
 }
 
 process RunDE {
@@ -76,6 +79,29 @@ process RunXSTREME {
   """
 }
 
+process OzelCLSI {
+  module 'r/4.5.1'
+  cpus '1'
+  memory '32GB'
+  time '2h'
+
+  input:
+  origin_map: Path
+  obj_dir: Path
+
+  output:
+  clsi: Set<Path> = files('ozel_2020_clsi/*_clsi.csv')
+
+  script:
+  """
+  ozel_clsi.R --proot ${params.root} \
+    --origin_map ${origin_map} \
+    --obj_dir ${obj_dir} \
+    --out_dir ozel_2020_clsi \
+    --dims ${params.ozel_clsi_dims}
+  """
+}
+
 process Fig2ISS {
   module 'r/4.5.1'
   cpus '1'
@@ -84,6 +110,7 @@ process Fig2ISS {
 
   input:
   obj: Path
+  ozel_clsi: Set<Path>
 
   output:
   sch: Set<Path> = files("fig/f2/A_*.pdf")
@@ -95,7 +122,8 @@ process Fig2ISS {
   script:
   """
   fig2_ISS.R --proot ${params.root} \
-    --obj ${obj}
+    --obj ${obj} \
+    --ozel_clsi ${ozel_clsi.join(',')}
   """
 }
 
@@ -193,7 +221,8 @@ workflow {
   de_ch = RunDE(params.obj, params.edger_helper)
   bed_ch = GetDARbed(de_ch.sdar).flatten()
   xstr_ch = RunXSTREME(bed_ch)
-  f2_iss_ch = Fig2ISS(params.obj)
+  ozel_clsi_ch = OzelCLSI(params.origin_map, params.ozel_obj_dir)
+  f2_iss_ch = Fig2ISS(params.obj, ozel_clsi_ch)
   f2_de_count_ch = Fig2DECount(de_ch.idar, de_ch.ideg)
   f2_ideo_ch = Fig2DARIdeo(de_ch.idar, params.gtf)
   fig2_qc_ch = SFig2QC(params.obj)
@@ -205,6 +234,7 @@ workflow {
   sp_deg = de_ch.sdeg
   sp_dar = de_ch.sdar
   xstreme = xstr_ch
+  ozel_clsi = ozel_clsi_ch
   f2_sch = f2_iss_ch.sch
   f2_iss_st = f2_iss_ch.iss_st
   f2_iss_st_tbl = f2_iss_ch.iss_st_tbl
@@ -237,6 +267,8 @@ output {
   sp_dar {
   }
   xstreme {
+  }
+  ozel_clsi {
   }
   f2_sch {
   }
