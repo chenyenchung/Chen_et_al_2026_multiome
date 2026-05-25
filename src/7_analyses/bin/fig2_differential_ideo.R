@@ -31,9 +31,10 @@ plot_mkideo <- function(
     spa_gr, tem_gr, ext = 1e5, nlayers = 10, tstep = 0.3, wsize = 5e4,
     saveas = NULL, class_pal = NULL, mode = "density", genes = FALSE,
     gene_size = 0.5, chr = "auto", zoom = NULL, lsize = 1, klwd = 0.01,
-    width = 5, height = 4
+    width = 5, height = 4, density_scale = c("global", "panel")
 ) {
   stopifnot(mode %in% c("density", "region"))
+  density_scale <- match.arg(density_scale)
   if (is.null(class_pal)) {
     class_pal <- c(
       "NB" = "#377EB8",
@@ -44,7 +45,7 @@ plot_mkideo <- function(
   
   .plot <- function(
     spa_gr, tem_gr, ext, nlayers, tstep, wsize, class_pal, mode, genes,
-    gene_size, chr, zoom, klwd, lsize
+    gene_size, chr, zoom, klwd, lsize, density_scale
   ) {
     pp <- getDefaultPlotParams(plot.type = 3)
     if (genes) {
@@ -56,8 +57,51 @@ plot_mkideo <- function(
     )
     kpAddChromosomeSeparators(kp, lwd = 2)
     base <- 0
+    classes <- c("NB", "GMC", "neuron")
     
-    for (i in c("NB", "GMC", "neuron")) {
+    if (mode == "density") {
+      windows <- tileGenome(
+        kp$chromosome.length,
+        tilewidth = wsize,
+        cut.last.tile.in.chrom = TRUE
+      )
+      max_density <- function(gr) {
+        max(countOverlaps(windows, gr))
+      }
+
+      density_ymax <- c(
+        spa = max(vapply(
+          classes,
+          function(i) max_density(subset(spa_gr, class == i)),
+          numeric(1)
+        )),
+        tem = max(vapply(
+          classes,
+          function(i) max_density(subset(tem_gr, class == i)),
+          numeric(1)
+        ))
+      )
+      if (density_scale == "global") {
+        density_ymax[] <- max(density_ymax)
+      }
+      add_density_axis <- function(data.panel, r0, r1, ymax) {
+        ymax <- unname(ymax)
+        kpAxis(
+          kp,
+          ymin = 0, ymax = ymax,
+          r0 = r0, r1 = r1,
+          data.panel = data.panel,
+          side = 2,
+          tick.pos = c(0, ymax),
+          labels = format(c(0, ymax), trim = TRUE, scientific = FALSE),
+          col = "gray30",
+          text.col = "gray30",
+          cex = lsize * 0.5
+        )
+      }
+    }
+
+    for (i in classes) {
       if (mode == "region") {
         kpPlotRegions(
           kp, data = extendRegions(subset(spa_gr, class == i), extend.end = ext),
@@ -71,7 +115,15 @@ plot_mkideo <- function(
           kp, data = subset(spa_gr, class == i),
           r0 = base, r1 = base + tstep, window.size = wsize,
           col = class_pal[i],
-          data.panel = 1
+          data.panel = 1,
+          ymin = 0,
+          ymax = density_ymax["spa"]
+        )
+        add_density_axis(
+          data.panel = 1,
+          r0 = base,
+          r1 = base + tstep,
+          ymax = density_ymax["spa"]
         )
       }
       
@@ -105,7 +157,15 @@ plot_mkideo <- function(
             kp, data = subset(tem_gr, class == i), window.size = wsize,
             r0 = base, r1 = base + tstep,
             col = class_pal[i],
-            data.panel = 2
+            data.panel = 2,
+            ymin = 0,
+            ymax = density_ymax["tem"]
+          )
+          add_density_axis(
+            data.panel = 2,
+            r0 = base,
+            r1 = base + tstep,
+            ymax = density_ymax["tem"]
           )
         }
         
@@ -123,13 +183,13 @@ plot_mkideo <- function(
     pdf(saveas, width = width, height = height)
     .plot(
       spa_gr, tem_gr, ext, nlayers, tstep, wsize, class_pal, mode, genes,
-      gene_size, chr, zoom, klwd, lsize
+      gene_size, chr, zoom, klwd, lsize, density_scale
     )
     dev.off()
   } else {
     .plot(
       spa_gr, tem_gr, ext, nlayers, tstep, wsize, class_pal, mode, genes,
-      gene_size, chr, zoom, klwd, lsize
+      gene_size, chr, zoom, klwd, lsize, density_scale
     )
   }
 }
@@ -158,6 +218,9 @@ tem_gr <- tem$feature |>
 tem_gr$pval <- tem$PValue
 tem_gr$class <- tem$subset
 
+spa_gr <- unique(spa_gr)
+tem_gr <- unique(tem_gr)
+
 if (!dir.exists("fig/f2")) dir.create("fig/f2", recursive = TRUE)
 if (!dir.exists("sup_fig/s2")) dir.create("sup_fig/s2", recursive = TRUE)
 
@@ -168,7 +231,7 @@ plot_mkideo(
 )
 
 plot_mkideo(
-  spa_gr, tem_gr, tstep = 0.3, nlayers = 6,
+  spa_gr, tem_gr, tstep = 0.3, nlayers = 3,
   zoom = GRanges("chrX:5510000-5630000"), mode = "region", ext = 0,
   genes = TRUE, klwd = 1, lsize = 0.5,
   saveas = file.path("fig", "f2", "dar_Vsx.pdf"),
@@ -176,7 +239,7 @@ plot_mkideo(
 )
 
 plot_mkideo(
-  spa_gr, tem_gr, tstep = 0.3, nlayers = 6,
+  spa_gr, tem_gr, tstep = 0.3, nlayers = 3,
   zoom = GRanges("chrX:4350000-4550000"), mode = "region", ext = 0,
   genes = TRUE, klwd = 1, lsize = 0.5,
   saveas = file.path("fig", "f2", "dar_bi.pdf"),
@@ -184,7 +247,7 @@ plot_mkideo(
 )
 
 plot_mkideo(
-  spa_gr, tem_gr, tstep = 0.3, nlayers = 6,
+  spa_gr, tem_gr, tstep = 0.3, nlayers = 3,
   zoom = GRanges("chr2R:8020000-8050000"), mode = "region", ext = 0,
   genes = TRUE, klwd = 1, lsize = 0.5,
   saveas = file.path("sup_fig", "s2", "dar_optix.pdf"),
@@ -192,7 +255,7 @@ plot_mkideo(
 )
 
 plot_mkideo(
-  spa_gr, tem_gr, tstep = 0.3, nlayers = 6,
+  spa_gr, tem_gr, tstep = 0.3, nlayers = 3,
   zoom = GRanges("chr2L:2420000-2470000"), mode = "region", ext = 0,
   genes = TRUE, klwd = 1, lsize = 0.5,
   saveas = file.path("sup_fig", "s2", "dar_dpp.pdf"),
@@ -200,7 +263,7 @@ plot_mkideo(
 )
 
 plot_mkideo(
-  spa_gr, tem_gr, tstep = 0.3, nlayers = 6,
+  spa_gr, tem_gr, tstep = 0.3, nlayers = 3,
   zoom = GRanges("chr2R:20910000-20940000"), mode = "region", ext = 0,
   genes = TRUE, klwd = 1, lsize = 0.5, gene_size = 0.2,
   saveas = file.path("sup_fig", "s2", "dar_rx.pdf"),

@@ -4,6 +4,7 @@ int
 log
 tmp
 result
+*.pdf
 *.html
 *.arrow
 .Rproj.user
