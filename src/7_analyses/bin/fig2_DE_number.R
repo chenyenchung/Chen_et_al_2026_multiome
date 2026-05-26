@@ -39,8 +39,8 @@ de_bar <- function(x, type = "DEGs", by = "contrast_type") {
   )
   dt$subset <- factor(
     dt$subset,
-    levels = c("NB", "GMC", "neuron"),
-    labels = c("NB", "GMC", "Neuron")
+    levels = c("NE", "NB", "GMC", "neuron"),
+    labels = c("NE", "NB", "GMC", "Neuron")
   )
   dt$contrast <- sub(" vs rest", "", dt$contrast)
   dt$contrast <- factor(
@@ -146,13 +146,13 @@ if (!dir.exists("fig/f2")) {
 ggsave_sep(
   de_bar(rna, type = "DEGs"),
   file.path("fig", "f2", "DEG_counts.pdf"),
-  width = 3,
+  width = 4,
   height = 4
 )
 ggsave_sep(
   de_bar(atac, type = "DARs"),
   file.path("fig", "f2", "DAR_counts.pdf"),
-  width = 3,
+  width = 4,
   height = 4
 )
 
@@ -167,6 +167,6 @@ if (!dir.exists("sup_fig/s2")) {
 ggsave_sep(
   de_bar(spatial_only, by = "de_class", type = "DEGs/DARs"),
   file.path("sup_fig", "s2", "spatial_DE_counts.pdf"),
-  width = 3,
+  width = 4,
   height = 4
 )

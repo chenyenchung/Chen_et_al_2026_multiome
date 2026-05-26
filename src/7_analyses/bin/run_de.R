@@ -109,17 +109,7 @@ if (!dir.exists("de_identity")) {
 }
 
 for (assay in c("RNA", "ATAC")) {
-  de_tbl <- lapply(c("NB", "GMC", "neuron"), function(class) {
-    temporal <- subset_test(
-      obj,
-      class,
-      "temporal_identity",
-      design_formula = ~ 0 + temporal_identity + bio_rep,
-      lfc = 0.5,
-      mode = "ovr",
-      assay = assay
-    )
-    temporal$contrast_type <- "temporal"
+  de_tbl <- lapply(c("NE", "NB", "GMC", "neuron"), function(class) {
     spatial <- subset_test(
       obj,
       class,
@@ -130,7 +120,20 @@ for (assay in c("RNA", "ATAC")) {
       assay = assay
     )
     spatial$contrast_type <- "spatial"
-    out <- rbind(spatial, temporal)
+    out <- spatial
+    if (class != "NE") {
+      temporal <- subset_test(
+        obj,
+        class,
+        "temporal_identity",
+        design_formula = ~ 0 + temporal_identity + bio_rep,
+        lfc = 0.5,
+        mode = "ovr",
+        assay = assay
+      )
+      temporal$contrast_type <- "temporal"
+      out <- rbind(out, temporal)
+    }
     if (class == "neuron") {
       notch <- subset_test(
         obj,

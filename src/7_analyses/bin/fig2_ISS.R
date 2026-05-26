@@ -54,6 +54,7 @@ library(dunn.test)
 library(tidyr)
 
 stage_levels <- c(
+  "NE",
   "NB",
   "GMC",
   "Neuron (L3)",
@@ -64,6 +65,11 @@ stage_levels <- c(
   "Neuron (P70)",
   "Neuron (Adult)"
 )
+plot_stage_levels <- setdiff(
+  stage_levels,
+  c("Neuron (P30)", "Neuron (P40)", "Neuron (P70)")
+)
+clsi_effect_threshold <- 0.2
 
 get_ozel_clsi_files <- function() {
   if (has_arg("ozel_clsi")) {
@@ -132,7 +138,7 @@ for (i in unique(plotdf$spatial_origin)) {
 
 # Identity segregation score comparison
 l3_clsi <- obj[[]][, c("class", "spatial_clsi", "temporal_clsi")]
-l3_clsi <- subset(l3_clsi, class %in% c("NB", "GMC", "neuron"))
+l3_clsi <- subset(l3_clsi, class %in% c("NE", "NB", "GMC", "neuron"))
 l3_clsi$stage <- as.character(l3_clsi$class)
 l3_clsi$stage[l3_clsi$stage == "neuron"] <- "Neuron (L3)"
 l3_clsi$class <- NULL
@@ -162,28 +168,96 @@ clsi_plot$ident <- factor(
 clsi_plot$stage <- factor(clsi_plot$stage, levels = stage_levels)
 
 clsi_test <- lapply(stage_levels, function(i) {
-  df_test <- subset(clsi_plot, stage == i)
-  wilcox_obj <- wilcox.test(clsi ~ ident, data = df_test, conf.int = TRUE)
+  df_test <- subset(clsi, stage == i)
+  df_test <- subset(
+    df_test,
+    !is.na(spatial_clsi) & !is.na(temporal_clsi)
+  )
+  if (i == "NE" || nrow(df_test) == 0) {
+    return(data.frame(
+      stage = i,
+      p.value = NA_real_,
+      confint_low = NA_real_,
+      confint_up = NA_real_,
+      median_spatial = NA_real_,
+      median_temporal = NA_real_,
+      median_diff = NA_real_
+    ))
+  }
+  clsi_diff <- df_test$spatial_clsi - df_test$temporal_clsi
+  wilcox_obj <- wilcox.test(
+    clsi_diff, mu = 0, conf.int = TRUE, exact = FALSE
+  )
+  wilcox_greater <- wilcox.test(
+    clsi_diff, mu = clsi_effect_threshold,
+    alternative = "greater", exact = FALSE
+  )
+  wilcox_less <- wilcox.test(
+    clsi_diff, mu = -clsi_effect_threshold,
+    alternative = "less", exact = FALSE
+  )
+  p_effect <- min(
+    1,
+    2 * min(wilcox_greater$p.value, wilcox_less$p.value)
+  )
   out <- data.frame(
     stage = i,
-    p.value = wilcox_obj$p.value,
+    p.value = p_effect,
     confint_low = wilcox_obj$conf.int[1],
-    confint_up = wilcox_obj$conf.int[2]
+    confint_up = wilcox_obj$conf.int[2],
+    median_spatial = median(df_test$spatial_clsi),
+    median_temporal = median(df_test$temporal_clsi),
+    median_diff = median(clsi_diff)
   )
 })
 clsi_test <- do.call(rbind, clsi_test)
+test_idx <- !is.na(clsi_test$p.value)
+clsi_test$p.adj <- NA_real_
+clsi_test$p.adj[test_idx] <- p.adjust(
+  clsi_test$p.value[test_idx], method = "bonferroni"
+)
+clsi_test$signif <- NA_character_
+clsi_test$signif[test_idx] <- ifelse(
+  clsi_test$p.adj[test_idx] < 0.001, "***",
+  ifelse(
+    clsi_test$p.adj[test_idx] < 0.01, "**",
+    ifelse(clsi_test$p.adj[test_idx] < 0.05, "*", "n.s.")
+  )
+)
 if (!dir.exists("tbl")) {dir.create("tbl")}
 write.csv(
   clsi_test, file.path("tbl", "clsi_spatial_vs_temporal.csv"), row.names = FALSE
 )
 
-p_svt <- clsi_plot |>
+clsi_plot_visible <- subset(clsi_plot, stage %in% plot_stage_levels)
+clsi_plot_visible$stage <- factor(
+  clsi_plot_visible$stage, levels = plot_stage_levels
+)
+
+clsi_sig <- subset(
+  clsi_test,
+  stage %in% plot_stage_levels & stage != "NE"
+)
+clsi_sig$stage <- factor(clsi_sig$stage, levels = plot_stage_levels)
+clsi_y <- aggregate(clsi ~ stage, clsi_plot_visible, max)
+clsi_sig <- merge(clsi_sig, clsi_y, by = "stage", all.x = TRUE)
+clsi_range <- diff(range(clsi_plot_visible$clsi, na.rm = TRUE))
+if (clsi_range == 0) {clsi_range <- 1}
+clsi_sig$label_y <- clsi_sig$clsi + clsi_range * 0.08
+
+p_svt <- clsi_plot_visible |>
   ggplot(aes(x = stage, y = clsi, color = ident, fill = ident)) +
   geom_hline(yintercept = 0) +
   geom_boxplot(
     outlier.size = 0.1,
-    position = position_dodge(width = 0.75),
+    position = position_dodge2(width = 0.75, preserve = "single"),
     alpha = 0.4
+  ) +
+  geom_text(
+    data = clsi_sig,
+    aes(x = stage, y = label_y, label = signif),
+    inherit.aes = FALSE,
+    size = 3
   ) +
   theme_classic() +
   theme(
@@ -194,6 +268,8 @@ p_svt <- clsi_plot |>
   ) +
   scale_color_manual(values = c("Temporal" = "#67001F", "Spatial" = "#053061")) +
   scale_fill_manual(values = c("Temporal" = "#67001F", "Spatial" = "#053061")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.18))) +
+  guides(fill = "none", color = "none") +
   labs(y = "Identity Segregation Score")
 
 ggsave(
@@ -203,6 +279,10 @@ ggsave(
 
 # For supplemental figure showing ISS is increasing for spatial identity
 spatial_only <- subset(clsi_plot, ident == "Spatial")
+spatial_only_visible <- subset(spatial_only, stage %in% plot_stage_levels)
+spatial_only_visible$stage <- factor(
+  spatial_only_visible$stage, levels = plot_stage_levels
+)
 dunn_obj <- dunn.test(
   spatial_only$clsi, spatial_only$stage, method = "bonferroni"
 )
@@ -214,7 +294,7 @@ write.csv(
   dunn_df, file.path("tbl", "clsi_spatial_over_class.csv"), row.names = FALSE
 )
 
-p_s_over_time <- spatial_only |>
+p_s_over_time <- spatial_only_visible |>
   ggplot(aes(x = stage, y = clsi)) +
   geom_hline(yintercept = 0) +
   geom_boxplot(notch = TRUE) +
@@ -228,5 +308,5 @@ p_s_over_time <- spatial_only |>
 if (!dir.exists("sup_fig/s2")) {dir.create("sup_fig/s2", recursive = TRUE)}
 ggsave(
   filename = file.path("sup_fig", "s2", "clsi_spatial_over_class.pdf"),
-  plot = p_s_over_time, height = 3.5, width = 7.5
+  plot = p_s_over_time, height = 3.5, width = 5
 )

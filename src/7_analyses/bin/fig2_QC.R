@@ -75,8 +75,8 @@ tlib <- metadata[, .N, by = c("library", "temporal_identity")][
 ][, prop := N / lib_size]
 tlib$temporal_identity <- factor(
   tlib$temporal_identity,
-  levels = c("Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey", "Ey/Hbn", "Hbn/Opa/Slp",
-             "Slp/D", "D/B-H1")
+  levels = c("Early", "Late", "Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey",
+             "Ey/Hbn", "Hbn/Opa/Slp", "Slp/D", "D/B-H1")
 )
 
 p_tem <- tlib |>
@@ -84,7 +84,10 @@ p_tem <- tlib |>
   geom_col() +
   geom_text(aes(label = N), position = position_stack(vjust = 0.5)) +
   scale_fill_manual(
-    values = c("Hth" = "#C76F6B",
+    values = c(
+               "Early" = "#00441B",
+               "Late" = "#40004B",
+               "Hth" = "#C76F6B",
                "Hth/Opa" = "#EFC8B9",
                "Opa/Erm" = "#FEE699",
                "Erm/Ey" = "#79A68C",

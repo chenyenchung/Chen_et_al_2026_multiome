@@ -169,6 +169,7 @@ process Fig2DARIdeo {
   optix: Path = file('sup_fig/s2/dar_optix.pdf')
   dpp: Path = file('sup_fig/s2/dar_dpp.pdf')
   rx: Path = file('sup_fig/s2/dar_rx.pdf')
+  brk: Path = file('sup_fig/s2/dar_brk.pdf')
 
   script:
   """
@@ -252,6 +253,7 @@ workflow {
   s2_ideo_optix = f2_ideo_ch.optix
   s2_ideo_dpp = f2_ideo_ch.dpp
   s2_ideo_rx = f2_ideo_ch.rx
+  s2_ideo_brk = f2_ideo_ch.brk
   s2_comp = fig2_qc_ch.comp
   s2_qc = fig2_qc_ch.qc
   s2_umap = fig2_umap_ch
@@ -303,6 +305,8 @@ output {
   s2_ideo_dpp {
   }
   s2_ideo_rx {
+  }
+  s2_ideo_brk {
   }
   s2_comp {
   }
