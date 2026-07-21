@@ -1,15 +1,18 @@
 #!/usr/bin/env nextflow
-nextflow.preview.types = true
+nextflow.enable.types = true
 nextflow.enable.strict = true
 
-params.root = '/scratch/ycc520/thesis'
-params.initobj = '/scratch/ycc520/thesis/int/objects/raw_cluster.rds'
-params.frags = '/scratch/ycc520/thesis/int/insertion_np'
-params.bam = '/scratch/ycc520/thesis/data/bam_new'
-params.gtf = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
-params.fai = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa.fai'
-params.cbc = '/scratch/ycc520/thesis/int/filtered_barcode/'
-params.binsize = 1
+params {
+  root: String = '/scratch/ycc520/thesis'
+  initobj: Path = '/scratch/ycc520/thesis/int/objects/raw_cluster.rds'
+  frags: Path = '/scratch/ycc520/thesis/int/insertion_np'
+  bam: Path = '/scratch/ycc520/thesis/data/bam_new'
+  gtf: Path = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.88.gtf'
+  fai: Path = '/projects/rps/cgsb/desplan/File_exchange/Yen_ref/ensembl_88_Nikos/Drosophila_melanogaster.BDGP6.dna_sm.toplevel.fa.fai'
+  cbc: Path = '/scratch/ycc520/thesis/int/filtered_barcode/'
+  binsize: Integer = 1
+  clsi_helper: Path = '/scratch/ycc520/thesis/src/common/clsi_helpers.R'
+}
 
 process GetDepth {
   conda 'python=3.14'
@@ -41,6 +44,7 @@ process Annotate {
   obj: Path
   depth: Path
   _frags: List<Path>
+  clsi_helper: Path
 
   output:
   wobj: Path = file('obj/annotated.rds')
@@ -52,7 +56,8 @@ process Annotate {
   """
   annotate.R --proot ${params.root} \
     --obj ${obj} \
-    --depth ${depth}
+    --depth ${depth} \
+    --clsi_helper ${clsi_helper}
   """
 }
 
@@ -63,7 +68,7 @@ process GetRawCount {
   time '1h'
 
   input:
-  data: List<Path>
+  data: Path
   gtf: Path
   _cbc: List<Path>
 
@@ -85,7 +90,7 @@ process GetSplitMeta {
   time '15m'
 
   input:
-  (lib, split, metadata): Tuple<String, String, Path>
+  tuple(lib: String, split: String, metadata: Path)
 
   output:
   Path = file("${lib}.csv")
@@ -107,7 +112,7 @@ process SplitATACBam {
   time '4h'
 
   input:
-  (lib, bam, meta): Tuple<String, Path, Path>
+  tuple(lib: String, bam: Path, meta: Path)
 
   output:
   cbam: Set<Path> = files("${lib}/*.bam")
@@ -128,7 +133,7 @@ process SplitGexBam {
   time '4h'
 
   input:
-  (lib, bam, meta): Tuple<String, Path, Path>
+  tuple(lib: String, bam: Path, meta: Path)
 
   output:
   cbam: Set<Path> = files("${lib}/*.bam")
@@ -198,17 +203,17 @@ process AvgGEXbw {
   time '30m'
 
   input:
-  (cluster, bws): Tuple<String, Bag<Path>>
+  tuple(cluster: String, bws: Bag<Path>)
 
   stage:
-  stageAs 'input.bw', bws
+  stageAs bws, 'input.bw'
 
   output:
   cbw: Path = file("${cluster}_gex.bw")
 
   script:
   """
-  bigwigAverage -b ${bws} -o ${cluster}_gex.bw
+  bigwigAverage -b ${bws.join(' ')} -o ${cluster}_gex.bw
   """
 }
 
@@ -219,17 +224,17 @@ process AvgATACbw {
   time '30m'
 
   input:
-  (cluster, bws): Tuple<String, Bag<Path>>
+  tuple(cluster: String, bws: Bag<Path>)
 
   stage:
-  stageAs 'input.bw', bws
+  stageAs bws, 'input.bw'
 
   output:
   cbw: Path = file("${cluster}_atac.bw")
 
   script:
   """
-  bigwigAverage -b ${bws} -o ${cluster}_atac.bw
+  bigwigAverage -b ${bws.join(' ')} -o ${cluster}_atac.bw
   """
 }
 
@@ -259,8 +264,10 @@ workflow {
 
   main:
   depth_ch = GetDepth(files(params.frags))
-  cn_ch = Annotate(file(params.initobj), depth_ch, files(params.frags))
-  raw_cmat_ch = GetRawCount(files(params.bam), file(params.gtf), files(params.cbc))
+  cn_ch = Annotate(
+    file(params.initobj), depth_ch, files(params.frags), file(params.clsi_helper)
+  )
+  raw_cmat_ch = GetRawCount(file(params.bam), file(params.gtf), files(params.cbc))
   meta_ch = GetSplitMeta(
     channel.fromList(['stf_2', 'stf_3', 'stf_4', 'stf_5']).combine(channel.fromList(['class,spatial_origin'])).combine(cn_ch.metadata)
   ).map { m ->

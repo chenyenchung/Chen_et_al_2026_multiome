@@ -57,19 +57,15 @@ stage_levels <- c(
   "NE",
   "NB",
   "GMC",
-  "Neuron (L3)",
-  "Neuron (P15)",
-  "Neuron (P30)",
-  "Neuron (P40)",
-  "Neuron (P50)",
-  "Neuron (P70)",
-  "Neuron (Adult)"
+  "Neuron",
+  "P15",
+  "P30",
+  "Adult"
 )
-plot_stage_levels <- setdiff(
-  stage_levels,
-  c("Neuron (P30)", "Neuron (P40)", "Neuron (P70)")
-)
+report_stage_levels <- c("NE", "NB", "GMC", "Neuron", "P15", "P30", "Adult")
+plot_stage_levels <- report_stage_levels
 clsi_effect_threshold <- 0.2
+clsi_adjustment_method <- "Bonferroni"
 
 get_ozel_clsi_files <- function() {
   if (has_arg("ozel_clsi")) {
@@ -86,7 +82,7 @@ get_ozel_clsi_files <- function() {
 }
 
 read_ozel_clsi <- function(files) {
-  stage_order <- c("P15", "P30", "P40", "P50", "P70", "Adult")
+  stage_order <- c("P15", "P30", "Adult")
   files_by_stage <- setNames(rep(NA_character_, length(stage_order)), stage_order)
   file_stage <- sub("_clsi\\.csv$", "", basename(files))
   files_by_stage[file_stage] <- files
@@ -100,11 +96,33 @@ read_ozel_clsi <- function(files) {
   }
 
   ozel_clsi <- lapply(stage_order, function(stage) {
-    clsi <- read.csv(files_by_stage[[stage]], row.names = 1)
-    clsi$stage <- paste0("Neuron (", stage, ")")
+    clsi <- read.csv(
+      files_by_stage[[stage]], row.names = 1, stringsAsFactors = FALSE
+    )
+    clsi$cell_id <- row.names(clsi)
+    clsi$dataset <- "Ozel_2020"
+    clsi$stage <- stage
+    clsi$object_class <- "neuron"
+    clsi$library_or_sample <- stage
+    optional_cols <- c(
+      "spatial_label", "temporal_label", "atlas_cluster_or_cell_type"
+    )
+    for (column in setdiff(optional_cols, colnames(clsi))) {
+      clsi[[column]] <- NA_character_
+    }
     clsi
   })
   do.call(rbind, ozel_clsi)
+}
+
+format_report_p <- function(p_value) {
+  if (is.na(p_value)) {
+    return(NA_character_)
+  }
+  if (p_value == 0) {
+    return(paste0("< ", format(.Machine$double.xmin, scientific = TRUE)))
+  }
+  format(p_value, scientific = TRUE, digits = 6, trim = TRUE)
 }
 
 obj <- readRDS(args[["obj"]])
@@ -136,23 +154,57 @@ for (i in unique(plotdf$spatial_origin)) {
   )
 }
 
-# Identity segregation score comparison
-l3_clsi <- obj[[]][, c("class", "spatial_clsi", "temporal_clsi")]
+# Identity segregation score comparison and raw-data export
+l3_required_cols <- c(
+  "class", "library", "spatial_clsi", "temporal_clsi",
+  "spatial_origin", "temporal_identity", "nn_pred_label"
+)
+l3_missing_cols <- setdiff(l3_required_cols, colnames(obj[[]]))
+if (length(l3_missing_cols) > 0) {
+  stop(
+    "annotated object is missing required metadata columns: ",
+    paste(l3_missing_cols, collapse = ", ")
+  )
+}
+l3_clsi <- obj[[]][, l3_required_cols]
 l3_clsi <- subset(l3_clsi, class %in% c("NE", "NB", "GMC", "neuron"))
+l3_clsi$cell_id <- row.names(l3_clsi)
+l3_clsi$dataset <- "L3_multiome"
 l3_clsi$stage <- as.character(l3_clsi$class)
-l3_clsi$stage[l3_clsi$stage == "neuron"] <- "Neuron (L3)"
-l3_clsi$class <- NULL
+l3_clsi$stage[l3_clsi$stage == "neuron"] <- "Neuron"
+l3_clsi$object_class <- as.character(l3_clsi$class)
+l3_clsi$library_or_sample <- as.character(l3_clsi$library)
+l3_clsi$spatial_label <- as.character(l3_clsi$spatial_origin)
+l3_clsi$temporal_label <- as.character(l3_clsi$temporal_identity)
+l3_clsi$atlas_cluster_or_cell_type <- as.character(l3_clsi$nn_pred_label)
+l3_clsi <- l3_clsi[, c(
+  "cell_id", "dataset", "stage", "object_class", "library_or_sample",
+  "spatial_clsi", "temporal_clsi", "spatial_label", "temporal_label",
+  "atlas_cluster_or_cell_type"
+)]
 
 ozel_files <- get_ozel_clsi_files()
 if (length(ozel_files) == 0) {
   stop("no Ozel cLSI CSVs supplied")
 }
 ozel_clsi <- read_ozel_clsi(ozel_files)
-ozel_clsi <- ozel_clsi[, c("stage", "spatial_clsi", "temporal_clsi")]
+ozel_clsi <- ozel_clsi[, colnames(l3_clsi)]
 
 clsi <- rbind(l3_clsi, ozel_clsi)
 clsi$stage <- factor(clsi$stage, levels = stage_levels)
 clsi <- subset(clsi, !is.na(stage))
+
+raw_iss <- subset(clsi, stage %in% report_stage_levels)
+raw_iss$stage <- as.character(raw_iss$stage)
+raw_iss <- raw_iss[, c(
+  "cell_id", "dataset", "stage", "object_class",
+  "spatial_clsi", "temporal_clsi", "spatial_label", "temporal_label",
+  "atlas_cluster_or_cell_type"
+)]
+colnames(raw_iss)[colnames(raw_iss) == "spatial_clsi"] <- "spatial_ISS"
+colnames(raw_iss)[colnames(raw_iss) == "temporal_clsi"] <- "temporal_ISS"
+if (!dir.exists("tbl")) {dir.create("tbl")}
+write.csv(raw_iss, file.path("tbl", "ISS_raw.csv"), row.names = FALSE, na = "")
 
 clsi_plot <- pivot_longer(
   clsi,
@@ -167,24 +219,42 @@ clsi_plot$ident <- factor(
 )
 clsi_plot$stage <- factor(clsi_plot$stage, levels = stage_levels)
 
-clsi_test <- lapply(stage_levels, function(i) {
+clsi_test <- lapply(report_stage_levels, function(i) {
   df_test <- subset(clsi, stage == i)
-  df_test <- subset(
-    df_test,
-    !is.na(spatial_clsi) & !is.na(temporal_clsi)
+  n_cells <- sum(!is.na(df_test$spatial_clsi))
+  n_libraries_or_samples <- length(unique(
+    df_test$library_or_sample[!is.na(df_test$spatial_clsi)]
+  ))
+  median_spatial <- if (n_cells > 0) {
+    median(df_test$spatial_clsi, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+  df_paired <- subset(
+    df_test, !is.na(spatial_clsi) & !is.na(temporal_clsi)
   )
-  if (i == "NE" || nrow(df_test) == 0) {
+  if (i == "NE") {
     return(data.frame(
       stage = i,
-      p.value = NA_real_,
-      confint_low = NA_real_,
-      confint_up = NA_real_,
-      median_spatial = NA_real_,
+      n_cells = n_cells,
+      n_libraries_or_samples = n_libraries_or_samples,
+      median_spatial = median_spatial,
       median_temporal = NA_real_,
-      median_diff = NA_real_
+      median_paired_difference = NA_real_,
+      HL_location_shift = NA_real_,
+      HL_CI_low = NA_real_,
+      HL_CI_high = NA_real_,
+      minimum_effect_threshold = NA_real_,
+      p_raw_numeric = NA_real_,
+      interpretation = paste(
+        "Spatial ISS only; temporal ISS and paired comparison not performed"
+      )
     ))
   }
-  clsi_diff <- df_test$spatial_clsi - df_test$temporal_clsi
+  if (nrow(df_paired) == 0) {
+    stop("no paired spatial and temporal ISS values for stage ", i)
+  }
+  clsi_diff <- df_paired$spatial_clsi - df_paired$temporal_clsi
   wilcox_obj <- wilcox.test(
     clsi_diff, mu = 0, conf.int = TRUE, exact = FALSE
   )
@@ -202,31 +272,62 @@ clsi_test <- lapply(stage_levels, function(i) {
   )
   out <- data.frame(
     stage = i,
-    p.value = p_effect,
-    confint_low = wilcox_obj$conf.int[1],
-    confint_up = wilcox_obj$conf.int[2],
-    median_spatial = median(df_test$spatial_clsi),
-    median_temporal = median(df_test$temporal_clsi),
-    median_diff = median(clsi_diff)
+    n_cells = nrow(df_paired),
+    n_libraries_or_samples = length(unique(df_paired$library_or_sample)),
+    median_spatial = median(df_paired$spatial_clsi),
+    median_temporal = median(df_paired$temporal_clsi),
+    median_paired_difference = median(clsi_diff),
+    HL_location_shift = unname(wilcox_obj$estimate),
+    HL_CI_low = unname(wilcox_obj$conf.int[1]),
+    HL_CI_high = unname(wilcox_obj$conf.int[2]),
+    minimum_effect_threshold = clsi_effect_threshold,
+    p_raw_numeric = p_effect,
+    interpretation = NA_character_
   )
 })
 clsi_test <- do.call(rbind, clsi_test)
-test_idx <- !is.na(clsi_test$p.value)
-clsi_test$p.adj <- NA_real_
-clsi_test$p.adj[test_idx] <- p.adjust(
-  clsi_test$p.value[test_idx], method = "bonferroni"
+test_idx <- !is.na(clsi_test$p_raw_numeric)
+clsi_test$p_adjusted_numeric <- NA_real_
+clsi_test$p_adjusted_numeric[test_idx] <- p.adjust(
+  clsi_test$p_raw_numeric[test_idx], method = "bonferroni"
 )
 clsi_test$signif <- NA_character_
 clsi_test$signif[test_idx] <- ifelse(
-  clsi_test$p.adj[test_idx] < 0.001, "***",
+  clsi_test$p_adjusted_numeric[test_idx] < 0.001, "***",
   ifelse(
-    clsi_test$p.adj[test_idx] < 0.01, "**",
-    ifelse(clsi_test$p.adj[test_idx] < 0.05, "*", "n.s.")
+    clsi_test$p_adjusted_numeric[test_idx] < 0.01, "**",
+    ifelse(clsi_test$p_adjusted_numeric[test_idx] < 0.05, "*", "n.s.")
   )
 )
-if (!dir.exists("tbl")) {dir.create("tbl")}
+clsi_test$interpretation[test_idx] <- ifelse(
+  clsi_test$p_adjusted_numeric[test_idx] < 0.05,
+  ifelse(
+    clsi_test$HL_location_shift[test_idx] > 0,
+    "Spatial ISS exceeds temporal ISS by at least the minimum effect threshold",
+    "Temporal ISS exceeds spatial ISS by at least the minimum effect threshold"
+  ),
+  "No evidence that the spatial-temporal ISS shift exceeds the minimum effect threshold"
+)
+clsi_test$p_raw <- vapply(
+  clsi_test$p_raw_numeric, format_report_p, FUN.VALUE = character(1)
+)
+clsi_test$p_adjusted <- vapply(
+  clsi_test$p_adjusted_numeric, format_report_p, FUN.VALUE = character(1)
+)
+clsi_test$adjustment_method <- ifelse(
+  test_idx, clsi_adjustment_method, "not_performed"
+)
+clsi_report <- clsi_test[, c(
+  "stage", "n_cells", "n_libraries_or_samples", "median_spatial",
+  "median_temporal", "median_paired_difference", "HL_location_shift",
+  "HL_CI_low", "HL_CI_high", "minimum_effect_threshold", "p_raw",
+  "p_adjusted", "adjustment_method", "interpretation"
+)]
 write.csv(
-  clsi_test, file.path("tbl", "clsi_spatial_vs_temporal.csv"), row.names = FALSE
+  clsi_report,
+  file.path("tbl", "clsi_spatial_vs_temporal.csv"),
+  row.names = FALSE,
+  na = ""
 )
 
 clsi_plot_visible <- subset(clsi_plot, stage %in% plot_stage_levels)

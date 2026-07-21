@@ -734,7 +734,7 @@ plot_mkideo(
   klwd = 1,
   lsize = 0.5,
   saveas = file.path("sup_fig", "s2", "dar_optix.pdf"),
-  width = 2,
+  width = 4,
   height = 3
 )
 
@@ -750,7 +750,7 @@ plot_mkideo(
   klwd = 1,
   lsize = 0.5,
   saveas = file.path("sup_fig", "s2", "dar_dpp.pdf"),
-  width = 2,
+  width = 4,
   height = 3
 )
 
@@ -767,7 +767,7 @@ plot_mkideo(
   lsize = 0.5,
   gene_size = 0.2,
   saveas = file.path("sup_fig", "s2", "dar_rx.pdf"),
-  width = 2,
+  width = 4,
   height = 3
 )
 
@@ -784,6 +784,6 @@ plot_mkideo(
   lsize = 0.5,
   gene_size = 0.7,
   saveas = file.path("sup_fig", "s2", "dar_brk.pdf"),
-  width = 2,
+  width = 4,
   height = 3
 )

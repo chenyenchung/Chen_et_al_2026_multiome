@@ -24,17 +24,25 @@ stopifnot(
   has_arg("out_dir")
 )
 
+if (!has_arg("clsi_helper")) {
+  args[["clsi_helper"]] <- file.path(
+    args[["proot"]], "src", "common", "clsi_helpers.R"
+  )
+}
+
 if (has_arg("obj")) {
   args[["obj"]] <- strsplit(args[["obj"]], ",")[[1]]
 }
 
 stopifnot(
   file.exists(args[["origin_map"]]),
+  file.exists(args[["clsi_helper"]]),
   !has_arg("obj_dir") || dir.exists(args[["obj_dir"]]),
   !has_arg("obj") || all(file.exists(args[["obj"]]))
 )
 
 renv::load(args[["proot"]])
+source(args[["clsi_helper"]])
 
 library(Seurat)
 library(RANN)
@@ -83,33 +91,6 @@ get_object_files <- function(args) {
   }
   stopifnot(has_arg("obj_dir"))
   list.files(args[["obj_dir"]], pattern = "\\.rds$", full.names = TRUE)
-}
-
-get_global_simpsons <- function(labels) {
-  label_freq <- table(labels)
-  label_proportion <- label_freq / length(labels)
-  sum(label_proportion ^ 2)
-}
-
-get_local_simpsons <- function(labels, nn_idx, global_si) {
-  if (global_si >= 1) {
-    stop("cannot correct local Simpson index when global Simpson index is 1")
-  }
-  vapply(seq_len(nrow(nn_idx)), function(i) {
-    local_freq <- table(labels[nn_idx[i, ]])
-    local_prop <- local_freq / ncol(nn_idx)
-    local_si <- sum(local_prop ^ 2)
-    (local_si - global_si) / (1 - global_si)
-  }, numeric(1))
-}
-
-compute_clsi <- function(labels, nn_idx, label_name) {
-  labels <- factor(labels)
-  if (nlevels(droplevels(labels)) < 2) {
-    stop(label_name, " has fewer than two observed labels after filtering")
-  }
-  global_si <- get_global_simpsons(labels)
-  get_local_simpsons(labels, nn_idx, global_si)
 }
 
 process_object <- function(obj_file) {
@@ -169,18 +150,21 @@ process_object <- function(obj_file) {
     spatial_clsi = compute_clsi(
       mapped$sori_simplified[keep],
       nn_idx,
-      "sori_simplified"
+      label_name = "sori_simplified"
     ),
     temporal_clsi = compute_clsi(
       mapped$tori[keep],
       nn_idx,
-      "tori"
+      label_name = "tori"
     ),
     notch_clsi = compute_clsi(
       mapped$nori[keep],
       nn_idx,
-      "nori"
+      label_name = "nori"
     ),
+    spatial_label = mapped$sori_simplified[keep],
+    temporal_label = mapped$tori[keep],
+    atlas_cluster_or_cell_type = cluster_id[keep],
     row.names = keep_cells
   )
 

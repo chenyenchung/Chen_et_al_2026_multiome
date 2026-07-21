@@ -8,16 +8,23 @@ if (interactive()) {
   args$obj <-"int/objects/raw_cluster.rds"
 }
 
+if (is.null(args$clsi_helper) && !is.null(args$proot)) {
+  args$clsi_helper <- file.path(args$proot, "src/common/clsi_helpers.R")
+}
+
 stopifnot(
   !is.null(args$obj),
   file.exists(args$obj),
   !is.null(args$proot),
   dir.exists(args$proot),
+  !is.null(args$clsi_helper),
+  file.exists(args$clsi_helper),
   !is.null(args$depth),
   file.exists(args$depth)
 )
 
 renv::load(args$proot)
+source(args$clsi_helper)
 
 library(Seurat)
 library(Signac)
@@ -449,46 +456,37 @@ obj@meta.data$X <- NULL
 obj[["seurat_clusters"]] <- Idents(obj)
 Idents(obj) <- "class"
 
-get_global_simpsons <- function(obj, group.by) {
-  label_freq <- table(obj[[]][[group.by]])
-  label_proportion <- label_freq / length(obj[[]][[group.by]])
-  return(sum(label_proportion ^ 2))
-}
+nn_idx <- obj@neighbors[["weighted.nn"]]@nn.idx
 
-get_local_simpsons <- function(obj, group.by, nn.name, gsi) {
-  lsi <- vapply(seq_len(ncol(obj)), function(x) {
-    idx <- obj@neighbors[[nn.name]]@nn.idx[x, ]
-    local_freq <- table(obj[[]][[group.by]][idx])
-    local_prop <- local_freq / length(idx)
-    local_si <- sum(local_prop ^ 2)
-    return((local_si - gsi) / (1 - gsi))
-  }, numeric(1))
-}
-
-spatial_gsi <- get_global_simpsons(obj, "spatial_origin")
-spatial_clsi <- get_local_simpsons(
-  obj, "spatial_origin", "weighted.nn", spatial_gsi
+spatial_labels <- obj[[]][["spatial_origin"]]
+spatial_clsi <- compute_clsi(
+  spatial_labels,
+  nn_idx,
+  label_name = "spatial_origin"
 )
 
 # Remove NE and LPC (no temporal annotation)
-temporal_gsi <- get_global_simpsons(
-  subset(obj, idents = c("NB", "GMC", "neuron")), "temporal_identity"
-)
-temporal_clsi <- get_local_simpsons(
-  obj, "temporal_identity", "weighted.nn", temporal_gsi
+temporal_eligible <- Idents(obj) %in% c("NB", "GMC", "neuron")
+temporal_labels <- obj[[]][["temporal_identity"]]
+temporal_clsi <- compute_clsi(
+  temporal_labels,
+  nn_idx,
+  global_labels = temporal_labels[temporal_eligible],
+  label_name = "temporal_identity"
 )
 
-temporal_clsi[!Idents(obj) %in% c("NB", "GMC", "neuron")] <- NA
+temporal_clsi[!temporal_eligible] <- NA
 
 # Only neurons has Notch annotation
-notch_gsi <- get_global_simpsons(
-  subset(obj, idents = "neuron"), "notch_status"
+notch_eligible <- Idents(obj) == "neuron"
+notch_labels <- obj[[]][["notch_status"]]
+notch_clsi <- compute_clsi(
+  notch_labels,
+  nn_idx,
+  global_labels = notch_labels[notch_eligible],
+  label_name = "notch_status"
 )
-
-notch_clsi <- get_local_simpsons(
-  obj, "notch_status", "weighted.nn", notch_gsi
-)
-notch_clsi[!Idents(obj) == "neuron"] <- NA
+notch_clsi[!notch_eligible] <- NA
 
 obj$spatial_clsi <- spatial_clsi
 obj$temporal_clsi <- temporal_clsi

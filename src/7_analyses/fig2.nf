@@ -13,6 +13,7 @@ params {
   origin_map: Path = '/scratch/ycc520/thesis/static/origin_map.csv'
   ozel_obj_dir: Path = '/scratch/ycc520/thesis/static/ozel_2020_obj'
   ozel_clsi_dims: Integer = 120
+  clsi_helper: Path = '/scratch/ycc520/thesis/src/common/clsi_helpers.R'
 }
 
 process RunDE {
@@ -88,6 +89,7 @@ process OzelCLSI {
   input:
   origin_map: Path
   obj_dir: Path
+  clsi_helper: Path
 
   output:
   clsi: Set<Path> = files('ozel_2020_clsi/*_clsi.csv')
@@ -98,7 +100,8 @@ process OzelCLSI {
     --origin_map ${origin_map} \
     --obj_dir ${obj_dir} \
     --out_dir ozel_2020_clsi \
-    --dims ${params.ozel_clsi_dims}
+    --dims ${params.ozel_clsi_dims} \
+    --clsi_helper ${clsi_helper}
   """
 }
 
@@ -116,6 +119,7 @@ process Fig2ISS {
   sch: Set<Path> = files("fig/f2/A_*.pdf")
   iss_st: Path = file('fig/f2/clsi_spatial_vs_temporal.pdf')
   iss_st_tbl: Path = file('tbl/clsi_spatial_vs_temporal.csv')
+  iss_raw_tbl: Path = file('tbl/ISS_raw.csv')
   iss_sc: Path = file('sup_fig/s2/clsi_spatial_over_class.pdf')
   iss_sc_tbl: Path = file('tbl/clsi_spatial_over_class.csv')
 
@@ -222,7 +226,9 @@ workflow {
   de_ch = RunDE(params.obj, params.edger_helper)
   bed_ch = GetDARbed(de_ch.sdar).flatten()
   xstr_ch = RunXSTREME(bed_ch)
-  ozel_clsi_ch = OzelCLSI(params.origin_map, params.ozel_obj_dir)
+  ozel_clsi_ch = OzelCLSI(
+    params.origin_map, params.ozel_obj_dir, params.clsi_helper
+  )
   f2_iss_ch = Fig2ISS(params.obj, ozel_clsi_ch)
   f2_de_count_ch = Fig2DECount(de_ch.idar, de_ch.ideg)
   f2_ideo_ch = Fig2DARIdeo(de_ch.idar, params.gtf)
@@ -239,6 +245,7 @@ workflow {
   f2_sch = f2_iss_ch.sch
   f2_iss_st = f2_iss_ch.iss_st
   f2_iss_st_tbl = f2_iss_ch.iss_st_tbl
+  f2_iss_raw_tbl = f2_iss_ch.iss_raw_tbl
   f2_iss_sc = f2_iss_ch.iss_sc
   f2_iss_sc_tbl = f2_iss_ch.iss_sc_tbl
   f2_deg_st = f2_de_count_ch.deg_st
@@ -277,6 +284,8 @@ output {
   f2_iss_st {
   }
   f2_iss_st_tbl {
+  }
+  f2_iss_raw_tbl {
   }
   f2_iss_sc {
   }
