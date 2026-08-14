@@ -85,8 +85,8 @@ p_tem <- tlib |>
   geom_text(aes(label = N), position = position_stack(vjust = 0.5)) +
   scale_fill_manual(
     values = c(
-               "Early" = "#00441B",
-               "Late" = "#40004B",
+               "Early" = "#ae00ff",
+               "Late" = "#c1ff00",
                "Hth" = "#C76F6B",
                "Hth/Opa" = "#EFC8B9",
                "Opa/Erm" = "#FEE699",

@@ -317,26 +317,26 @@ workflow {
 output {
   wobj {
     path { f ->
-      f >> "int/objects/${f.name}"
+      f >> "../int/objects/${f.name}"
     }
   }
   fig_f2 {
     path { f ->
-      f >> "result/fig/f2/${f.name}"
+      f >> "fig/f2/${f.name}"
     }
   }
   sup_s2 {
     path { f ->
-      f >> "result/sup_fig/s2/${f.name}"
+      f >> "sup_fig/s2/${f.name}"
     }
   }
   raw_count {
-    path 'int/'
+    path '../int/'
   }
   atac_bw {
-    path 'result/bw/ATAC'
+    path 'bw/ATAC'
   }
   gex_bw {
-    path 'result/bw/GEX'
+    path 'bw/GEX'
   }
 }

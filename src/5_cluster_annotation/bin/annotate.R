@@ -386,8 +386,8 @@ p_tid <- DimRasPlot(obj, group.by = "temporal_identity") +
                "Hbn/Opa/Slp" = "#B4C6E6",
                "Slp/D" = "#A6A1CD",
                "D/B-H1" = "#A46690",
-               "Early" = "#00441B",
-               "Late" = "#40004B"),
+               "Early" = "#ae00ff",
+               "Late" = "#c1ff00"),
     na.value = "grey80",
     breaks = c(
       "Early", "Late", "Hth", "Hth/Opa", "Opa/Erm", "Erm/Ey", "Ey/Hbn", "Hbn/Opa/Slp",
