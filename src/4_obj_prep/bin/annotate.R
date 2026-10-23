@@ -1,11 +1,11 @@
 #!/usr/bin/env Rscript
 library(R.utils)
-options(future.globals.maxSize = 1024 ^ 3)
+options(future.globals.maxSize = 1024^3)
 
 args <- commandArgs(trailingOnly = TRUE, asValues = TRUE)
 
 if (interactive()) {
-  args$obj <-"int/base_obj.rds"
+  args$obj <- "int/base_obj.rds"
   args$p <- "work/cd/be383e1a1285346200bb6c7673d158/varp.rds"
   args$g <- "work/cd/be383e1a1285346200bb6c7673d158/varg.rds"
   args$proot <- "/scratch/ycc520/thesis"
@@ -66,7 +66,10 @@ obj <- AddMetaData(
 )
 obj <- AddMetaData(
   obj,
-  metadata = as.numeric(readLines(file.path(args$nnout, "TargetPreds-Confidence.txt"))),
+  metadata = as.numeric(readLines(file.path(
+    args$nnout,
+    "TargetPreds-Confidence.txt"
+  ))),
   col.name = "nn_conf"
 )
 
@@ -74,14 +77,25 @@ obj <- subset(obj, permissive_filter)
 
 DefaultAssay(obj) <- "RNA"
 
-obj <- SCTransform(obj,
-                   vars.to.regress = "percent.mt",
-                   residual.features = g,
-                   return.only.var.genes = FALSE)
+obj <- SCTransform(
+  obj,
+  vars.to.regress = "percent.mt",
+  residual.features = g,
+  return.only.var.genes = FALSE
+)
 obj <- RunPCA(obj, npcs = 100, assay = "SCT")
+# Should have ran TFIDF here.
 obj <- RunSVD(obj, features = p, n = 101, assay = "ATAC")
-obj <- FindMultiModalNeighbors(obj, reduction.list = list("pca", "lsi"), dims.list = list(1:100, 2:101))
-obj <- FindClusters(obj, resolution = as.numeric(args$resolution), graph.name = "wsnn")
+obj <- FindMultiModalNeighbors(
+  obj,
+  reduction.list = list("pca", "lsi"),
+  dims.list = list(1:100, 2:101)
+)
+obj <- FindClusters(
+  obj,
+  resolution = as.numeric(args$resolution),
+  graph.name = "wsnn"
+)
 obj <- RunUMAP(obj, nn.name = "weighted.nn")
 
 saveRDS(obj, "base_ann_obj.rds")
