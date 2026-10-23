@@ -1,4 +1,4 @@
-# Domain-resolved multiome profiling of the L3 OPC neurons
+# Domain-resolved multiome profiling of outer proliferation center-generated neurons at the third larval instar
 
 Code for processing paired RNA and chromatin-accessibility data, annotating cell populations, testing differential expression and accessibility, and computing corrected local Simpson indices (cLSI). The study and demonstration dataset is [**GSE344177**](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE344177). Analyses are implemented as separate workflows under `src/`.
 
